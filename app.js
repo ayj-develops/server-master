@@ -9,15 +9,18 @@ const API_ROUTE = '/api/v0';
 const app = express();
 
 const corsOptions = require('./config/cors.config');
+const connectMongo = require('./config/mongo.config');
 
 app.use(cors(corsOptions));
 app.use(helmet());
 app.use(compression());
 app.use(bodyParser());
+app.use(connectMongo());
 app.disable('x-powered-by');
 
 // listening to the port
 const PORT = 8000;
+// eslint-disable-next-line no-console
 app.listen(PORT, () => console.log(`listening on port ${PORT}`)); // dev
 
 // index
