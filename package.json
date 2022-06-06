@@ -4,6 +4,8 @@
   "description": "",
   "main": "app.js",
   "scripts": {
+    "start": "nodemon app.js",
+    "lint": "eslint --fix --ext .js,.jsx .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -15,5 +17,23 @@
   "bugs": {
     "url": "https://github.com/ayj-develops/server-master/issues"
   },
-  "homepage": "https://github.com/ayj-develops/server-master#readme"
+  "homepage": "https://github.com/ayj-develops/server-master#readme",
+  "dependencies": {
+    "body-parser": "^1.20.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.1",
+    "eslintrc": "^1.0.6",
+    "express": "^4.18.1",
+    "helmet": "^5.1.0",
+    "http": "^0.0.1-security",
+    "mongoose": "^6.3.5",
+    "nodemon": "^2.0.16",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "eslint": "^8.17.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.26.0"
+  }
 }
