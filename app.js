@@ -15,8 +15,9 @@ app.use(cors(corsOptions));
 app.use(helmet());
 app.use(compression());
 app.use(bodyParser());
-app.use(connectMongo());
 app.disable('x-powered-by');
+
+connectMongo();
 
 // listening to the port
 const PORT = 8000;
