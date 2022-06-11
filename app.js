@@ -28,3 +28,15 @@ app.listen(PORT, () => console.log(`listening on port ${PORT}`)); // dev
 app.get('/', (req, res) => {
   res.sendStatus(200);
 });
+
+const userRouter = require("./api/user");
+app.use(`${API_ROUTE}/user`, userRouter);
+
+const commentRouter = require("./api/comment");
+app.use(`${API_ROUTE}/comment`, commentRouter);
+
+const clubRouter = require("./api/club");
+app.use(`${API_ROUTE}/club`, clubRouter);
+
+const postRouter = require("./api/post");
+app.use(`${API_ROUTE}/post`, postRouter);

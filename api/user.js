@@ -1,0 +1,84 @@
+const express = require("express");
+const bodyParser = require("body-parser");
+const User = require("../models/user.model");
+const hash = require('object-hash');
+
+const router = express.Router();
+const jsonParser = bodyParser.json();
+
+// TODO: Secure endpoint
+// Registers the user
+
+router.post("/create", jsonParser, async (req, res) => {
+  let { email } = req.body;
+  // do not await when querying mongoose
+  if (!email.includes("tdsb.on.ca")) {
+      res.status(400).json({ "Message": "Non TDSB users are not allowed" });
+  }
+  email = hash(email, {algorithm : 'sha1'});
+  User.findOne({ email }, (err, user) => {
+    if (err) res.status(500).json({ "Message": "Error" })// some error the server encounters
+    else if (user) res.status(400).json({ "Message": "Email is already in use" }) // if user exists then that means the email is taken
+    else {
+          // Create a new user
+          const newUser = new User({ email });
+          newUser.save()
+            .then(() => {
+              res.status(201).json({ "Message": "Success" })
+            })
+            .catch(err => res.status(500).json({ "Message": "Server Error", "Error": `${err}` }));
+    }
+  });
+});
+
+router.get("/", jsonParser, async (req, res) => {
+    if (req.query._id === null || req.query._id === undefined) {
+        res.status(200).send(await User.find());
+    }
+    else {
+        console.log("reached");
+        const {_id} = req.body;
+        User.findById({ _id }, async (err, user) => {
+            if (err) {
+                res.status(500).send({"Message" : "Error"});
+            }
+            else if (user === null) {
+                res.status(400).send({"Message" : "User not found"});
+            }
+            else {
+                res.status(200).send(user);
+            }
+        })
+    }
+})
+
+
+router.delete("/delete", jsonParser, async (req, res) => {
+    let {email} = req.body;
+    email = hash(email, {algorithm: 'sha1'});
+    User.findOneAndDelete({ "email" : email }, (err, user) => {
+        if (err) res.status(500).json({ "Message" : "Error"});
+        else if (user) res.status(400).json({ "Message" : "User not found" });
+        else {
+            res.status(200).send({ "Message" : "Success" , "user" : user});
+        }
+    })
+})
+
+router.put("/update", jsonParser, async (req, res) => {
+    const {_id, pfp} = req.body;
+    User.findByIdAndUpdate( {_id}, {"pfp" : pfp}, (err, user) => {
+        if (err) {
+            res.status(500).send({"Message" : "Error"});
+        }
+        else if (user) {
+            res.status(400).send({"Message" : "User not found"});
+        }
+        else {
+            res.status(200).send({ "Message" : "Success"});
+        }
+    } )
+})
+
+
+module.exports = router;
