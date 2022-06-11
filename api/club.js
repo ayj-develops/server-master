@@ -54,48 +54,30 @@ router.post("/create", jsonParser, async (req, res) => {
   router.delete("/delete", jsonParser, async(req, res) => {
       let { name } = req.body;
       name = hash(name, {algorithm: 'sha1'});
-      Club.findOneAndDelete( { name }, (err, club) => {
-          if (err) res.status(500).send({"Message": "Error"});
-          else if (club) res.status(400).send({"Message" : "Club not found"});
-          else res.status(200).send({"Message" : "Success"});
+
+      Club.findOne( { name }, (err, club) => {
+          if (err) {
+              res.status(500).send({"Message" : "Error"});
+          }
+          else if (club === null) {
+              res.status(400).send({"Message" : "Club not found"});
+          }
+          else {
+            Club.findOneAndDelete( { name }, (err, club) => {
+                if (err) res.status(500).send({"Message": "Error"});
+                else res.status(200).send({"Message" : "Success"});
+            })
+          }
       })
   })
 
   router.put("/update", jsonParser, async (req, res) => {
       let {_id, name, description, execs, teacher} = req.body;
-      //console.log(req);
       if (req.body._id === undefined || req.body._id === null) {
           res.status(400).send({"Message" : "Club name parameter missing"});
       }
       else {
-            let tempClub = new Club();
             Club.findById({ _id }, (err, club) => {
-                if (!err) {
-                    tempClub = club;
-                }
-            })
-            if (req.body.name === undefined || req.body.name === null) {
-            name = tempClub.name;
-            }
-            else {
-                name = hash(name, 'sha1');
-            }
-            if (req.body.description === undefined || req.body.description === null) {
-                description = tempClub.description;
-            }
-            if (req.body.execs === undefined || req.body.execs === null) {
-                execs = tempClub.execs;
-            }
-            else {
-                execs = hash(execs, {algorithm: 'sha1'});
-            }
-            if (req.body.teacher === undefined || req.body.teacher === null) {
-                teacher = tempClub.teacher;
-            }
-            else {
-                teacher = hash(teacher, {algorithm : 'sha1'});
-            }
-            Club.findByIdAndUpdate({ _id }, {"name" : name, "description" : description, "execs" : execs, "teacher" : teacher}, async (err, club) => {
                 if (err) {
                     res.status(500).send({"Message" : "Error"});
                 }
@@ -103,9 +85,40 @@ router.post("/create", jsonParser, async (req, res) => {
                     res.status(400).send({"Message" : "Club not found"});
                 }
                 else {
-                    res.status(200).send({"Message" : "Success"});
+                    if (name === undefined || name === null) {
+                        name = club.name;
+                        }
+                        else {
+                            name = hash(name, 'sha1');
+                        }
+                        if (description === undefined || description === null) {
+                            description = club.description;
+                        }
+                        if (execs === undefined || execs === null) {
+                            execs = club.execs;
+                        }
+                        else {
+                            execs = hash(execs, {algorithm: 'sha1'});
+                        }
+                        if (teacher === undefined || teacher === null) {
+                            teacher = club.teacher;
+                        }
+                        else {
+                            teacher = hash(teacher, {algorithm : 'sha1'});
+                        }
+                    Club.findByIdAndUpdate({ _id }, {"name" : name, "description" : description, "execs" : execs, "teacher" : teacher}, async (err, club) => {
+                        if (err) {
+                            res.status(500).send({"Message" : "Error"});
+                        }
+                        else {
+                            res.status(200).send({"Message" : "Success"});
+                        }
+                    })
                 }
+
             })
+            
+            
         }
   })
   

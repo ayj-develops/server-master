@@ -43,62 +43,83 @@ router.get("/", jsonParser, async (req, res) => {
 })
 
 router.delete("/delete", jsonParser, async (req, res) => {
-    const { _id, body } = req.body;
-    Post.findByIdAndUpdate( {_id}, {"body" : body}, (err, comment) => {
-        if (err) {
-            res.status(500).send({"Message" : "Error"});
-        }
-        else {
-            res.status(200).send({"Message": "Success"});
-        }
-    })
-})
-
-router.put("/update", jsonParser, async (req, res) => {
-    let { _id, title, body, image, author } = req.body;
-
-        // check for required params
-    if (req.body._id === undefined || req.body._id === null) {
-        res.status(400).send({"Message" : "Club name parameter missing"});
+    const { _id } = req.body;
+    if (_id === null) {
+        res.status(400).send({"Message" : "ID params are missing"});
     }
-    else if (req.body.author === undefined || req.body.author === null) {
-        res.status(400).send({"Message" : "Author parameter is missing"});
+    else if (author === null) {
+        res.status(400).send({"Message" : "Author params are missing"});
     }
-
     else {
-
-        let tempPost = new Post();
-        Post.findById({ _id }, (err, post) => {
-            if (!err) {
-                tempPost = post;
-            }
-        })
-
-        if (req.body.title === undefined || req.body.title === null) {
-            title = tempPost.title;
-        }
-        if (req.body.body === undefined || req.body.body === null) {
-            body = tempPost.body;
-        }
-        if (req.body.image === undefined || req.body.image === null) {
-            image = tempPost.image;
-        }
-
-        Post.findByIdAndUpdate( {_id}, {"title" : title, "body" : body, "image" : image}, async (err, post) => {
+        let author = hash(req.body.author, {algorithm : 'sha1'});
+        Post.findById( {_id}, (err, post) => {
             if (err) {
                 res.status(500).send({"Message" : "Error"});
             }
             else if (post === null) {
                 res.status(400).send({"Message" : "Post not found"});
             }
-            else if (post.author != author) {
-                res.status(400).send({"Message" : "You are not the author of this post"});
+            else if (post.author !== author) {
+                res.status(400).send({"Message" : "You are not OP"});
             }
             else {
-                res.status(200).send({"Message" : "Success"});
+                Post.findByIdAndDelete( {_id}, (err, comment) => {
+                    if (err) {
+                        res.status(500).send({"Message" : "Error"});
+                    }
+                    else {
+                        res.status(200).send({"Message": "Success"});
+                    }
+                })
             }
         })
     }
-}) 
+})
+
+router.put("/update", jsonParser, async (req, res) => {
+    let { _id, title, body, image, author } = req.body;
+
+        // check for required params
+    if (_id === undefined || _id === null) {
+        res.status(400).send({"Message" : "Id parameter missing"});
+    }
+    else if (author === undefined || author === null) {
+        res.status(400).send({"Message" : "Author parameter is missing"});
+    }
+
+    else {
+        author = hash(author, {algorithm: 'sha1'});
+        Post.findById({ _id }, (err, post) => {
+            if (err) {
+                res.status(500).send({"Message" : "Error"});
+            }
+            else if (post === null) {
+                res.status(400).send({"Message" : "Post not found"});
+            }
+            else if (post.author !== author) {
+                res.status(400).send({"Message" : "You are not the author of this post"});
+            }
+            else {
+                if (title === undefined || title === null) {
+                    title = post.title;
+                }
+                if (body === undefined || body === null) {
+                    body = post.body;
+                }
+                if (image === undefined || image === null) {
+                    image = post.image;
+                }
+                Post.findByIdAndUpdate( {_id}, {"title" : title, "body" : body, "image" : image}, (err, post) => {
+                    if (err) {
+                        res.status(500).send({"Message" : "Error"});
+                    }
+                    else {
+                        res.status(200).send({"Message" : "Success"});
+                    }
+                })
+            }
+        })
+    }
+})
 
 module.exports = router;

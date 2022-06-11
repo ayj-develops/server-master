@@ -36,7 +36,6 @@ router.get("/", jsonParser, async (req, res) => {
         res.status(200).send(await User.find());
     }
     else {
-        console.log("reached");
         const {_id} = req.body;
         User.findById({ _id }, async (err, user) => {
             if (err) {
@@ -56,28 +55,55 @@ router.get("/", jsonParser, async (req, res) => {
 router.delete("/delete", jsonParser, async (req, res) => {
     let {email} = req.body;
     email = hash(email, {algorithm: 'sha1'});
-    User.findOneAndDelete({ "email" : email }, (err, user) => {
-        if (err) res.status(500).json({ "Message" : "Error"});
-        else if (user) res.status(400).json({ "Message" : "User not found" });
+    User.findOne( {"email" : email}, (err, user) => {
+        if (err) {
+            res.status(500).send({"Message" : "Error"});
+        }
+        else if (user === null) {
+            res.status(400).send({"Message" : "User not found"})
+        }
         else {
-            res.status(200).send({ "Message" : "Success" , "user" : user});
+            User.findOneAndDelete({ "email" : email }, (err, user) => {
+                if (err) res.status(500).json({ "Message" : "Error"});
+                else {
+                    res.status(200).send({ "Message" : "Success" , "user" : user});
+                }
+            })
         }
     })
+    
 })
 
 router.put("/update", jsonParser, async (req, res) => {
     const {_id, pfp} = req.body;
-    User.findByIdAndUpdate( {_id}, {"pfp" : pfp}, (err, user) => {
-        if (err) {
+    User.findById( {_id}, async (err, user) => {
+        if (_id === undefined) {
+            res.status(400).send({"Message" : "Id parameter missing"});
+        }
+        else if (err) {
             res.status(500).send({"Message" : "Error"});
         }
-        else if (user) {
+        else if (user === null) {
             res.status(400).send({"Message" : "User not found"});
         }
-        else {
-            res.status(200).send({ "Message" : "Success"});
+        else if (_id !== user._id) {
+            res.status(400).send({"Message" : "You are not this user"});
         }
-    } )
+        else {
+            User.findByIdAndUpdate( {_id}, {"pfp" : pfp}, (err, user) => {
+                if (err) {
+                    res.status(500).send({"Message" : "Error"});
+                }
+                else if (user) {
+                    res.status(400).send({"Message" : "User not found"});
+                }
+                else {
+                    res.status(200).send({ "Message" : "Success"});
+                }
+            } )
+        }
+    })
+    
 })
 
 
