@@ -14,7 +14,6 @@ router.post("/create", jsonParser, async (req, res) => {
         res.status(400).json({ "Message": "Word limit exceeded" });
     }
     else {
-        name = hash(name, {algorithm: 'sha1'});
         teacher = hash(teacher, {algorithm: 'sha1'});
         Club.findOne({ name }, (err, taken) => {
             if (err) res.status(500).json({ "Message": "Error" });
@@ -52,8 +51,7 @@ router.post("/create", jsonParser, async (req, res) => {
   })
   
   router.delete("/delete", jsonParser, async(req, res) => {
-      let { name } = req.body;
-      name = hash(name, {algorithm: 'sha1'});
+      const { name } = req.body;
 
       Club.findOne( { name }, (err, club) => {
           if (err) {
@@ -87,9 +85,6 @@ router.post("/create", jsonParser, async (req, res) => {
                 else {
                     if (name === undefined || name === null) {
                         name = club.name;
-                        }
-                        else {
-                            name = hash(name, 'sha1');
                         }
                         if (description === undefined || description === null) {
                             description = club.description;
