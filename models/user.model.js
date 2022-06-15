@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const Schema = mongoose.Schema;
+const { Schema } = mongoose;
 
 const UserSchema = new Schema({
   // username: {
@@ -18,18 +18,21 @@ const UserSchema = new Schema({
   pfp: {
     type: Object,
     required: false,
-  }
-    // id: {
-    //     type: String
-    // },
-    // posts: {
-    //     type: Array()
-    // },
-    // perms: {
-    //     type: Perm
-    // }
-})
+  },
+  favourites_club: [
+    { type: mongoose.Types.ObjectId, ref: 'Club' },
+  ],
+  // id: {
+  //     type: String
+  // },
+  // posts: {
+  //     type: Array()
+  // },
+  // perms: {
+  //     type: Perm
+  // }
+});
 
-const User = mongoose.model("User", UserSchema);
+const User = mongoose.model('User', UserSchema);
 
 module.exports = User;
