@@ -2,6 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const hash = require('object-hash');
 const User = require('../models/user.model');
+const { checkExist } = require('./exist');
 
 const router = express.Router();
 const jsonParser = bodyParser.json();
@@ -12,23 +13,28 @@ const jsonParser = bodyParser.json();
 router.post('/create', jsonParser, async (req, res) => {
     let { email } = req.body;
     // do not await when querying mongoose
-    if (!email.includes('tdsb.on.ca')) {
+    if (!checkExist(email)) {
+        res.status(400).send({"Message" : "Email parameter is missing"});
+    }
+    else if (!email.includes('tdsb.on.ca')) {
         res.status(400).json({ Message: 'Non TDSB users are not allowed' });
     }
-    email = hash(email, { algorithm: 'sha1' });
-    User.findOne({ email }, (err, user) => {
-        if (err) res.status(500).json({ Message: 'Error' });// some error the server encounters
-        else if (user) res.status(400).json({ Message: 'Email is already in use' }); // if user exists then that means the email is taken
-        else {
-            // Create a new user
-            const newUser = new User({ email });
-            newUser.save()
-                .then(() => {
-                    res.status(201).json({ Message: 'Success' });
-                })
-                .catch((err) => res.status(500).json({ Message: 'Server Error', Error: `${err}` }));
-        }
-    });
+    else {
+        email = hash(email, { algorithm: 'sha1' });
+        User.findOne({ email }, (err, user) => {
+            if (err) res.status(500).json({ Message: 'Error' });// some error the server encounters
+            else if (user) res.status(400).json({ Message: 'Email is already in use' }); // if user exists then that means the email is taken
+            else {
+                // Create a new user
+                const newUser = new User({ email });
+                newUser.save()
+                    .then(() => {
+                        res.status(201).json({ Message: 'Success' });
+                    })
+                    .catch((err) => res.status(500).json({ Message: 'Server Error', Error: `${err}` }));
+            }
+        });
+    }
 });
 
 router.get('/', jsonParser, async (req, res) => {

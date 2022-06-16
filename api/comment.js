@@ -2,15 +2,18 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const Comment = require("../models/comment.model");
 const hash = require('object-hash');
+const { checkExist } = require('./exist');
 
 const router = express.Router();
 const jsonParser = bodyParser.json();
 
 router.post("/create", jsonParser, async (req, res) => {
     let { name, body, parent } = req.body;
-    const text = req.body.body;
     // do not await when querying mongoose
-    if (text.length > 500) {
+    if (!checkExist(name) || !checkExist(body) || !checkExist(parent)) {
+        res.status(400).send({"Message" : "Missing params"});
+    }
+    else if (req.body.body.length > 500) {
         res.status(400).json({ "Message": "Word limit exceeded" });
     }
     else {
@@ -24,17 +27,20 @@ router.post("/create", jsonParser, async (req, res) => {
   });
 
   router.delete("/delete", jsonParser, async (req, res) => {
-    let {name, body} = req.body;
-    name = hash(name, {algorithm: 'sha1'});
-    User.findOne( {"name" : name}, (err, comment) => {
+    let {_id, name} = req.body;
+    name = hash(name, { algorithm: 'sha1' });
+    User.findById( {_id}, (err, comment) => {
         if (err) {
             res.status(500).send({"Message" : "Error"});
         }
-        else if (comment === null) {
+        else if (!checkExist(comment)) {
             res.status(400).send({"Message" : "Comment not found"})
         }
+        else if (comment.name !== name) {
+            res.status(400).send({"Message" : "This is not your comment"});
+        }
         else {
-            User.findOneAndDelete({ "name" : name }, (err, comment) => {
+            User.findByIdAndDelete({ _id }, (err, comment) => {
                 if (err) res.status(500).json({ "Message" : "Error"});
                 else {
                     res.status(200).send({ "Message" : "Success" });
@@ -46,7 +52,7 @@ router.post("/create", jsonParser, async (req, res) => {
 })
 
   router.get("/", jsonParser, async (req, res) => {
-      if (req.query._id === null || req.query._id === undefined) {
+      if (!checkExist(req.query._id)) {
         res.status(200).send(await Comment.find());
       }
       else {
@@ -67,7 +73,7 @@ router.post("/create", jsonParser, async (req, res) => {
 
   router.put("/update", jsonParser, async (req, res) => {
       const { _id, body } = req.body;
-      if (_id === undefined || _id === null) {
+      if (!checkExist(_id)) {
           res.status(400).send({"Message" : "_id param is missing"})
       }
       else 

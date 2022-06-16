@@ -2,6 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const Club = require("../models/club.model");
 const hash = require('object-hash');
+const { checkExist } = require('./exist');
 
 const router = express.Router();
 const jsonParser = bodyParser.json();
@@ -31,7 +32,7 @@ router.post("/create", jsonParser, async (req, res) => {
   });
 
   router.get("/", jsonParser, async (req, res) => {
-      if (req.query._id === null || req.query._id === undefined) {
+      if (!checkExist(req.query._id)) {
         res.status(200).send(await Club.find());
       }
       else {
@@ -52,26 +53,30 @@ router.post("/create", jsonParser, async (req, res) => {
   
   router.delete("/delete", jsonParser, async(req, res) => {
       const { name } = req.body;
-
-      Club.findOne( { name }, (err, club) => {
-          if (err) {
-              res.status(500).send({"Message" : "Error"});
-          }
-          else if (club === null) {
-              res.status(400).send({"Message" : "Club not found"});
-          }
-          else {
-            Club.findOneAndDelete( { name }, (err, club) => {
-                if (err) res.status(500).send({"Message": "Error"});
-                else res.status(200).send({"Message" : "Success"});
-            })
-          }
-      })
+      if (!checkExist(name)) {
+        res.status(400).send({"Message" : "Missing params"});
+      }
+      else {
+        Club.findOne( { name }, (err, club) => {
+            if (err) {
+                res.status(500).send({"Message" : "Error"});
+            }
+            else if (club === null) {
+                res.status(400).send({"Message" : "Club not found"});
+            }
+            else {
+                Club.findOneAndDelete( { name }, (err, club) => {
+                    if (err) res.status(500).send({"Message": "Error"});
+                    else res.status(200).send({"Message" : "Success"});
+                })
+            }
+        })
+      }
   })
 
   router.put("/update", jsonParser, async (req, res) => {
       let {_id, name, description, execs, teacher} = req.body;
-      if (req.body._id === undefined || req.body._id === null) {
+      if (!checkExist(req.query._id)) {
           res.status(400).send({"Message" : "Club name parameter missing"});
       }
       else {
