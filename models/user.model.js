@@ -18,16 +18,10 @@ const UserSchema = new Schema({
   pfp: {
     type: Object,
     required: false,
-  }
-    // id: {
-    //     type: String
-    // },
-    // posts: {
-    //     type: Array()
-    // },
-    // perms: {
-    //     type: Perm
-    // }
+  },
+  // favorites: {
+  //   type: Array()
+  // }
 })
 
 const User = mongoose.model("User", UserSchema);
