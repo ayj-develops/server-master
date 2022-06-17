@@ -19,18 +19,19 @@ const ClubSchema = new Schema({
     minlength: 1,
     maxlength: 100,
   },
-  execs: {
-    type: Array,
-    required: true,
-    unique: false,
-    minlength: 1,
+  execs: [{ exec_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' } }],
+  teacher: [{ teacher_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' } }],
+  clubfest_link: {
+    type: String,
+    required: false,
   },
-  teacher: {
-    type: Array,
-    required: true,
-    unique: false,
-    minlength: 1,
+  socials: {
+    instagram: String,
+    google_classroom_code: { type: String, maxlength: 8 },
+    signup_link: String,
   },
+  events: Number,
+  posts: Number,
 });
 
 const Club = mongoose.model('Club', ClubSchema);
