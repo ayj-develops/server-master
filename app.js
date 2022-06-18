@@ -39,8 +39,12 @@ app.use(`${API_ROUTE}/comment`, commentRouter);
 
 const clubRouter = require('./api/club');
 
-app.use(`${API_ROUTE}/club`, clubRouter);
+app.use(`${API_ROUTE}/clubs`, clubRouter);
 
 const postRouter = require('./api/post');
 
 app.use(`${API_ROUTE}/post`, postRouter);
+
+const handleErrors = require('./utils/errorHandler');
+
+app.use(handleErrors);

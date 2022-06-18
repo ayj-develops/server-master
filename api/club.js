@@ -1,113 +1,231 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const hash = require('object-hash');
+const { default: mongoose } = require('mongoose');
+const { default: slugify } = require('slugify');
 const Club = require('../models/club.model');
+const {
+  BadRequest, Conflict, NotFound, GeneralError,
+} = require('../utils/error');
 
 const router = express.Router();
 const jsonParser = bodyParser.json();
 
-router.post('/create', jsonParser, async (req, res) => {
-  let {
-    name, description, execs, teacher,
-  } = req.body;
-  const text = req.body.description;
-  // do not await when querying mongoose
-  if (text.length > 100) {
-    res.status(400).json({ Message: 'Word limit exceeded' });
-  } else {
-    teacher = hash(teacher, { algorithm: 'sha1' });
-    Club.findOne({ name }, (err, taken) => {
-      if (err) res.status(500).json({ Message: 'Error' });
-      else if (taken) res.status(400).json({ Message: 'Name has been taken' });
-      else {
-        const newClub = new Club({
-          name, description, execs, teacher,
-        });
-        newClub.save()
-          .then(() => {
-            res.status(201).json({ Message: 'Success' });
-          })
-          .catch((err) => res.status(500).json({ Message: 'Server Error', Error: `${err}` }));
-      }
-    });
-  }
-});
+/**
+ * Create a club
+ */
+router.post('/club/create', jsonParser, async (req, res, next) => {
+  const newClubFields = {};
+  const socialsObject = {};
 
-router.get('/', jsonParser, async (req, res) => {
-  if (req.query._id === null || req.query._id === undefined) {
-    res.status(200).send(await Club.find());
-  } else {
-    const { _id } = req.body;
-    Club.findById({ _id }, async (err, club) => {
-      if (err) {
-        res.status(500).send({ Message: 'Error' });
-      } else if (club === null) {
-        res.status(400).send({ Message: 'Club not found' });
-      } else {
-        res.status(200).send(club);
-      }
-    });
-  }
-});
+  try {
+    if (req.body.name) {
+      newClubFields.name = req.body.name;
+      const newSlug = slugify(req.body.name, { lower: true });
+      newClubFields.slug = newSlug;
+    } else throw new BadRequest('Missing required field: Name');
+    if (req.body.instagram) socialsObject.instagram = req.body.instagram;
+    if (req.body.google_classroom_code) {
+      socialsObject.google_classroom_code = req.body.google_classroom_code;
+    }
+    if (req.body.signup_link) socialsObject.signup_link = req.body.signup_link;
+    if (req.body.description) {
+      if (req.body.description.length < 150) newClubFields.description = req.body.description;
+      else throw new BadRequest('Character limit exceeded');
+    } else throw new BadRequest('Missing required field: Description');
 
-router.delete('/delete', jsonParser, async (req, res) => {
-  const { name } = req.body;
+    if (req.body.clubfest_link) newClubFields.clubfest_link = req.body.clubfest_link;
 
-  Club.findOne({ name }, (err, club) => {
-    if (err) {
-      res.status(500).send({ Message: 'Error' });
-    } else if (club === null) {
-      res.status(400).send({ Message: 'Club not found' });
-    } else {
-      Club.findOneAndDelete({ name }, (err, club) => {
-        if (err) res.status(500).send({ Message: 'Error' });
-        else res.status(200).send({ Message: 'Success' });
+    if (socialsObject.google_classroom_code
+      || socialsObject.instagram || socialsObject.signup_link) {
+      newClubFields.socials = socialsObject;
+    }
+
+    newClubFields.events = 0;
+    newClubFields.posts = 0;
+
+    const clubExists = await Club.exists({ slug: newClubFields.slug });
+
+    if (clubExists !== null) throw new Conflict('Resource Conflict: Name is taken already');
+    else {
+      Club.create(newClubFields, (err, club) => {
+        if (err) throw new GeneralError(`${err}`, `${err}`);
+        else res.status(201).send(club);
       });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Delete a club by their slug
+ */
+router.delete('/club/slug/:slug/delete', jsonParser, async (req, res) => {
+  const filterSlug = req.params.slug;
+  Club.findOneAndDelete({ slug: filterSlug }, (err, club) => {
+    if (err) {
+      throw new BadRequest(`${err}`, `${err}`);
+    } else if (club === null) throw new NotFound(`Not found: ${filterSlug}`);
+    else res.status(200).send(club);
+  });
+});
+
+// TODO: Everything following should use the error handler and error classes
+
+/**
+ * Filter clubs through id
+ */
+router.get('/club/id/:id', jsonParser, async (req, res) => {
+  const filterId = req.params.id;
+  Club.find({ _id: mongoose.mongo.ObjectId(filterId) }, (err, club) => {
+    if (!err) {
+      res.status(200).send(club);
+    } else {
+      res.status(400).send({ error: true, message: `${err}` });
     }
   });
 });
 
-router.put('/update', jsonParser, async (req, res) => {
-  let {
-    _id, name, description, execs, teacher,
-  } = req.body;
-  if (req.body._id === undefined || req.body._id === null) {
-    res.status(400).send({ Message: 'Club name parameter missing' });
-  } else {
-    Club.findById({ _id }, (err, club) => {
-      if (err) {
-        res.status(500).send({ Message: 'Error' });
-      } else if (club === null) {
-        res.status(400).send({ Message: 'Club not found' });
-      } else {
-        if (name === undefined || name === null) {
-          name = club.name;
-        }
-        if (description === undefined || description === null) {
-          description = club.description;
-        }
-        if (execs === undefined || execs === null) {
-          execs = club.execs;
-        } else {
-          execs = hash(execs, { algorithm: 'sha1' });
-        }
-        if (teacher === undefined || teacher === null) {
-          teacher = club.teacher;
-        } else {
-          teacher = hash(teacher, { algorithm: 'sha1' });
-        }
-        Club.findByIdAndUpdate({ _id }, {
-          name, description, execs, teacher,
-        }, async (err, club) => {
-          if (err) {
-            res.status(500).send({ Message: 'Error' });
-          } else {
-            res.status(200).send({ Message: 'Success' });
-          }
-        });
-      }
-    });
+/**
+ * Filter clubs through their slug
+ */
+router.get('/club/slug/:slug', jsonParser, async (req, res) => {
+  const filterSlug = req.params.slug;
+  Club.find({ slug: filterSlug }, (err, club) => {
+    if (err) res.status(400).send({ error: true, message: `${err}` });
+    else if (club.length === 0) {
+      res.status(404).send({ error: true, message: 'Not Found' });
+    } else res.status(200).send(club);
+  });
+});
+
+/**
+ * Retrieve all clubs
+ */
+router.get('/all', jsonParser, async (req, res) => {
+  Club.find({}, (err, clubs) => {
+    if (!err) {
+      res.status(200).send(clubs);
+    } else {
+      res.status(400).send({ error: true, message: `${err}` });
+    }
+  });
+});
+
+/**
+ * Updates a club object
+ *
+ *
+ * Does NOT update teacher or execs. Those go through a separate endpoint
+ */
+router.put('/club/slug/:slug/update', jsonParser, async (req, res) => {
+  const filterSlug = req.params.slug;
+  const updateFields = {};
+  const socialsObject = {};
+  if (req.body.name) {
+    updateFields.name = req.body.name;
+    const newSlug = slugify(req.body.name, { lower: true });
+    updateFields.slug = newSlug;
   }
+  if (req.body.instagram) socialsObject.instagram = req.body.instagram;
+  if (req.body.google_classroom_code) {
+    socialsObject.google_classroom_code = req.body.google_classroom_code;
+  }
+  if (req.body.signup_link) socialsObject.signup_link = req.body.signup_link;
+  if (req.body.description) updateFields.description = req.body.description;
+  if (req.body.clubfest_link) updateFields.clubfest_link = req.body.clubfest_link;
+
+  if (socialsObject.google_classroom_code || socialsObject.instagram || socialsObject.signup_link) {
+    updateFields.socials = socialsObject;
+  }
+
+  Club.findOneAndUpdate({ slug: filterSlug }, updateFields, { new: true }, (err, club) => {
+    if (err) res.status(500).send({ error: true, message: `${err}` });
+    else if (club === null) res.status(404).send({ error: true, message: 'Not Found' });
+    else {
+      res.status(200).send(club);
+    }
+  });
+});
+
+/**
+ * adds club execs
+ */
+router.put('/club/slug/:slug/executives/add', jsonParser, async (req, res) => {
+  const filterSlug = req.params.slug;
+  let updateFieldExecutive;
+  if (req.body.executive) updateFieldExecutive = req.body.executive;
+  Club.findOneAndUpdate(
+    { slug: filterSlug },
+    { $addToSet: { execs: updateFieldExecutive } },
+    { new: true },
+    (err, club) => {
+      if (err) {
+        res.status(400).send({ error: true, message: `${err}` });
+      } else if (club === null) res.status(404).send({ error: true, message: 'Not Found' });
+      else res.status(200).send(club);
+    },
+  );
+});
+
+/**
+ * adds club teachers
+ */
+router.put('/club/slug/:slug/teacher/add', jsonParser, async (req, res) => {
+  const filterSlug = req.params.slug;
+  let updateFieldTeacher;
+  if (req.body.teacher) updateFieldTeacher = req.body.teacher;
+  Club.findOneAndUpdate(
+    { slug: filterSlug },
+    { $addToSet: { teachers: updateFieldTeacher } },
+    { new: true },
+    (err, club) => {
+      if (err) {
+        res.status(400).send({ error: true, message: `${err}` });
+      } else if (club === null) res.status(404).send({ error: true, message: 'Not Found' });
+      else res.status(200).send(club);
+    },
+  );
+});
+
+/**
+ * delete club execs
+ */
+router.delete('/club/slug/:slug/executives/delete', jsonParser, async (req, res) => {
+  const filterSlug = req.params.slug;
+  let updateFieldExecutive;
+  if (req.body.executive) updateFieldExecutive = req.body.executive;
+  Club.findOneAndUpdate(
+    { slug: filterSlug },
+    { $pull: { execs: updateFieldExecutive } },
+    { new: true },
+    (err, club) => {
+      if (err) {
+        res.status(400).send({ error: true, message: `${err}` });
+      } else if (club === null) res.status(404).send({ error: true, message: 'Not Found' });
+      else res.status(200).send(club);
+    },
+  );
+});
+
+/**
+ * delete club teachers
+ */
+router.delete('/club/slug/:slug/teachers/delete', jsonParser, async (req, res) => {
+  const filterSlug = req.params.slug;
+  let updateFieldTeacher;
+  if (req.body.teacher) updateFieldTeacher = req.body.teacher;
+  Club.findOneAndUpdate(
+    { slug: filterSlug },
+    { $pull: { teachers: updateFieldTeacher } },
+    { new: true },
+    (err, club) => {
+      if (err) {
+        res.status(400).send({ error: true, message: `${err}` });
+      } else if (club === null) res.status(404).send({ error: true, message: 'Not Found' });
+      else res.status(200).send(club);
+    },
+  );
 });
 
 module.exports = router;

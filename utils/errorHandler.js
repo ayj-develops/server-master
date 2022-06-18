@@ -4,10 +4,10 @@ const { GeneralError, BadRequest } = require('./error');
 /**
  * Handles errors, to use wrap in try catch and pass catch err into next()
  *
- * @param {*} err 
- * @param {*} req 
- * @param {*} res 
- * @param {*} next 
+ * @param {*} err   -> error
+ * @param {*} req   -> request obj
+ * @param {*} res   -> response obj
+ * @param {*} next  -> callback
  * @returns response status and message
  */
 const handleErrors = (err, req, res, next) => {

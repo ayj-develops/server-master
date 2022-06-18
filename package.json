@@ -30,7 +30,8 @@
     "mongoose": "^6.3.5",
     "nodemon": "^2.0.16",
     "object-hash": "^3.0.0",
-    "path": "^0.12.7"
+    "path": "^0.12.7",
+    "slugify": "^1.6.5"
   },
   "devDependencies": {
     "eslint": "^8.17.0",
