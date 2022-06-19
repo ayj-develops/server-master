@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const bodyParser = require('body-parser');
+const admin = require('firebase-admin');
 
 const API_ROUTE = '/api/v0';
 
@@ -17,6 +18,16 @@ app.use(compression());
 app.use(bodyParser());
 app.disable('x-powered-by');
 
+require('dotenv').config();
+
+const pathToService = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+// eslint-disable-next-line import/no-dynamic-require
+const serviceAccount = require(pathToService);
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
 connectMongo();
 
 // listening to the port
@@ -28,6 +39,10 @@ app.listen(PORT, () => console.log(`listening on port ${PORT}`)); // dev
 app.get('/', (req, res) => {
   res.sendStatus(200);
 });
+
+const decodeIdToken = require('./middleware/firebaseAuthHandler');
+
+app.use(decodeIdToken);
 
 const userRouter = require('./api/user');
 
@@ -45,6 +60,6 @@ const postRouter = require('./api/post');
 
 app.use(`${API_ROUTE}/post`, postRouter);
 
-const handleErrors = require('./utils/errorHandler');
+const handleErrors = require('./middleware/errorHandler');
 
 app.use(handleErrors);

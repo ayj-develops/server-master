@@ -5,7 +5,7 @@ const { default: slugify } = require('slugify');
 const Club = require('../models/club.model');
 const {
   BadRequest, Conflict, NotFound, GeneralError,
-} = require('../utils/error');
+} = require('../middleware/error');
 
 const router = express.Router();
 const jsonParser = bodyParser.json();
@@ -60,14 +60,18 @@ router.post('/club/create', jsonParser, async (req, res, next) => {
 /**
  * Delete a club by their slug
  */
-router.delete('/club/slug/:slug/delete', jsonParser, async (req, res) => {
+router.delete('/club/slug/:slug/delete', jsonParser, async (req, res, next) => {
   const filterSlug = req.params.slug;
-  Club.findOneAndDelete({ slug: filterSlug }, (err, club) => {
-    if (err) {
-      throw new BadRequest('Bad Request', `${err}`);
-    } else if (club === null) throw new NotFound(`Not found: ${filterSlug}`);
-    else res.status(200).send(club);
-  });
+  try {
+    Club.findOneAndDelete({ slug: filterSlug }, (err, club) => {
+      if (err) {
+        throw new BadRequest('Bad Request', `${err}`);
+      } else if (club === null) throw new NotFound(`Not found: ${filterSlug}`);
+      else res.status(200).send(club);
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 /**

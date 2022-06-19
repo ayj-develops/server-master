@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-const { GeneralError, BadRequest } = require('./error');
+const { GeneralError } = require('./error');
 
 /**
  * Handles errors, to use wrap in try catch and pass catch err into next()

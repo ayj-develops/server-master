@@ -1,6 +1,9 @@
 # env file
 *.env
 
+# secrets
+*.firebase.secret.json
+
 # Logs
 logs
 *.log
