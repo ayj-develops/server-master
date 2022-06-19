@@ -20,6 +20,9 @@ app.disable('x-powered-by');
 
 require('dotenv').config();
 
+/*
+ * Initialize firebase app
+ */
 const pathToService = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 // eslint-disable-next-line import/no-dynamic-require
 const serviceAccount = require(pathToService);
@@ -28,22 +31,24 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
+// Connect to mongodb
 connectMongo();
-
-// listening to the port
-const PORT = 8000;
-// eslint-disable-next-line no-console
-app.listen(PORT, () => console.log(`listening on port ${PORT}`)); // dev
 
 // index
 app.get('/', (req, res) => {
   res.sendStatus(200);
 });
 
+// setup firebase middlware
 const decodeIdToken = require('./middleware/firebaseAuthHandler');
 
 app.use(decodeIdToken);
 
+const handleErrors = require('./middleware/errorHandler');
+
+app.use(handleErrors);
+
+/* define api routes */
 const userRouter = require('./api/user');
 
 app.use(`${API_ROUTE}/user`, userRouter);
@@ -60,6 +65,7 @@ const postRouter = require('./api/post');
 
 app.use(`${API_ROUTE}/post`, postRouter);
 
-const handleErrors = require('./middleware/errorHandler');
-
-app.use(handleErrors);
+// listening to the port
+const PORT = 8000;
+// eslint-disable-next-line no-console
+app.listen(PORT, () => console.log(`listening on port ${PORT}`)); // dev
