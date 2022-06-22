@@ -142,7 +142,7 @@ router.get('/club/id/:id', jsonParser, async (req, res, next) => {
   const filterId = req.params.id; // retrieve id from the param
   try {
     /**
-     * Query using mongodb's find to find the club object
+     * Query using mongoose find to find the club object
      * @return {Club} club -> the json representation of the club
      */
     Club.find({ _id: mongoose.mongo.ObjectId(filterId) }, (err, club) => {
@@ -158,50 +158,83 @@ router.get('/club/id/:id', jsonParser, async (req, res, next) => {
 });
 
 /**
- * Filter clubs through their slug
+ * Filter clubs through the Club object slug
+ *
+ * @property {string} slug -> slug is the unique identifier from a club's name
+ * @return {Club} club     -> the club that contains this slug
  */
 router.get('/club/slug/:slug', jsonParser, async (req, res, next) => {
-  const filterSlug = req.params.slug;
+  const filterSlug = req.params.slug; // retrieve slug from the param
   try {
+    /**
+     * Query using mongoose find to find the club object
+     * @return {Club} club -> the json representation of the club
+     */
     Club.find({ slug: filterSlug }, (err, club) => {
-      if (err) throw new BadRequest('Bad Request', `${err}`);
-      else if (club.length === 0) {
+      if (err) throw new BadRequest('Bad Request', `${err}`); // If there's an error through a BadRequest 400 with the error
+      else if (club.length === 0) { // If the club doesn't exist, throw a NotFound error
         throw new NotFound(`Not found: ${filterSlug}`);
       } else res.status(200).send(club);
     });
-  } catch (err) {
+  } catch (err) { // If any error was thrown pass it to the middleware
     next(err);
   }
 });
 
 /**
  * Retrieve all clubs
+ *
+ * @return {Club} clubs -> An array of Club objects that is all the clubs in the database
  */
 router.get('/all', jsonParser, async (req, res, next) => {
   try {
+    /**
+     * Query using mongoose find without any conditions to get all club objects
+     * @return {Club} club -> the json representation of the club
+     */
     Club.find({}, (err, clubs) => {
-      if (!err) {
+      if (!err) { // If there's an error through a BadRequest 400 with the error
         res.status(200).send(clubs);
       } else {
         throw new BadRequest('Bad Request', `${err}`);
       }
     });
-  } catch (err) {
+  } catch (err) { // If any error was thrown pass it to the middleware
     next(err);
   }
 });
 
 /**
- * Updates a club object
+ * Updates a club object but does NOT update teacher or execs.
+ * Those go through a separate endpoint:
  *
+ * @see "/club/slug/:slug/executives/add"
+ * @see "/club/slug/:slug/teacher/add"
  *
- * Does NOT update teacher or execs. Those go through a separate endpoint
+ * @property {string} slug                      -> slug of the club object to be updated
+ * @property {string} name                      -> Required field in request body,
+ *                                                 denotes name of the club
+ * @property {object} socialsObject             -> Assembled object from the instagram,
+ *                                                 google_classroom_code and signup_link fields
+ * @property {string} instagram                 -> instagram link of the club
+ * @property {string} google_classroom_code     -> the club's google classroom code to join
+ * @property {string} signup_link               -> the club's link to a google form or
+ *                                                 somewhere for users to sign up
+ * @property {string} description               -> The 'about me' section of the club
+ * @property {string} clubfest_link             -> Link to the club's promotion video
+ *
+ * @returns {club} -> JSON representation of the updated club object from mongodb
+ *
  */
 router.put('/club/slug/:slug/update', jsonParser, async (req, res, next) => {
   const filterSlug = req.params.slug;
   const updateFields = {};
   const socialsObject = {};
   try {
+    /*
+     * Check if these fields exist, and if they do,
+     * then add them to the update object to be updated
+     */
     if (req.body.name) {
       updateFields.name = req.body.name;
       const newSlug = slugify(req.body.name, { lower: true });
@@ -220,6 +253,14 @@ router.put('/club/slug/:slug/update', jsonParser, async (req, res, next) => {
       updateFields.socials = socialsObject;
     }
 
+    /**
+     * Use mongodb's query findOneAndUpdate() to find the club
+     * object with the slug and update it using the update fields
+     *
+     * @property {object} queryOptions    -> mongoose query options to
+     *                                       return the newly update object
+     * @return {Club} club                -> the new club object that was queried and updated
+     */
     Club.findOneAndUpdate({ slug: filterSlug }, updateFields, { new: true }, (err, club) => {
       if (err) throw new GeneralError(`${err}`, `${err}`);
       else if (club === null) throw new NotFound(`Not found: ${filterSlug}`);
