@@ -274,19 +274,22 @@ router.put('/club/slug/:slug/update', jsonParser, async (req, res, next) => {
 });
 
 /**
- * endpoint to update club execs
+ * Update the club executives array in a particular club.
+ * Pass a slug in the param to query that specific club
  *
- * adds club execs
+ * @property {string} slug -> slug of the club object to be updated
+ * @return {Club} club -> the new club object that is updated
  */
 router.put('/club/slug/:slug/executives/add', jsonParser, async (req, res, next) => {
   const filterSlug = req.params.slug;
-  let updateFieldExecutive;
+  let updateFieldExecutive; // If there contains an executive use this to store
   try {
     if (req.body.executive) updateFieldExecutive = req.body.executive;
     Club.findOneAndUpdate(
       { slug: filterSlug },
-      { $addToSet: { execs: updateFieldExecutive } },
-      { new: true },
+      { $addToSet: { execs: updateFieldExecutive } }, // Use mongoose operator to insert this club
+      // executive element into the array of execs
+      { new: true }, // enable return the newly updated club object
       (err, club) => {
         if (err) {
           throw new BadRequest('Bad Request', `${err}`);
@@ -300,19 +303,22 @@ router.put('/club/slug/:slug/executives/add', jsonParser, async (req, res, next)
 });
 
 /**
- * endpoint to update club teacher
+ * Update the club teachers array in a particular club.
+ * Pass a slug in the param to query that specific club
  *
- * adds club teachers
+ * @property {string} slug -> slug of the club object to be updated
+ * @return {Club} club -> the new club object that is updated
  */
 router.put('/club/slug/:slug/teacher/add', jsonParser, async (req, res, next) => {
   const filterSlug = req.params.slug;
-  let updateFieldTeacher;
+  let updateFieldTeacher; // If there contains a teacher use this to store
   if (req.body.teacher) updateFieldTeacher = req.body.teacher;
   try {
     Club.findOneAndUpdate(
       { slug: filterSlug },
-      { $addToSet: { teachers: updateFieldTeacher } },
-      { new: true },
+      { $addToSet: { teachers: updateFieldTeacher } }, // Use mongoose operator to insert this club
+      // teacher element into the array of teachers
+      { new: true }, // enable return the newly updated club object
       (err, club) => {
         if (err) {
           throw new BadRequest('Bad Request', `${err}`);
@@ -326,7 +332,11 @@ router.put('/club/slug/:slug/teacher/add', jsonParser, async (req, res, next) =>
 });
 
 /**
- * delete club execs
+ * Delete one in the club executives array in a particular club.
+ * Pass a slug in the param to query that specific club
+ *
+ * @property {string} slug -> slug of the club object to be updated
+ * @return {Club} club -> the new club object that is updated
  */
 router.delete('/club/slug/:slug/executives/delete', jsonParser, async (req, res, next) => {
   const filterSlug = req.params.slug;
@@ -335,7 +345,8 @@ router.delete('/club/slug/:slug/executives/delete', jsonParser, async (req, res,
   try {
     Club.findOneAndUpdate(
       { slug: filterSlug },
-      { $pull: { execs: updateFieldExecutive } },
+      { $pull: { execs: updateFieldExecutive } }, // Use mongoose operator to remove the
+      // specific executive from the execs array
       { new: true },
       (err, club) => {
         if (err) {
@@ -350,7 +361,11 @@ router.delete('/club/slug/:slug/executives/delete', jsonParser, async (req, res,
 });
 
 /**
- * delete club teachers
+ * Delete one in the club teachers array in a particular club.
+ * Pass a slug in the param to query that specific club
+ *
+ * @property {string} slug -> slug of the club object to be updated
+ * @return {Club} club -> the new club object that is updated
  */
 router.delete('/club/slug/:slug/teachers/delete', jsonParser, async (req, res, next) => {
   const filterSlug = req.params.slug;
@@ -359,7 +374,8 @@ router.delete('/club/slug/:slug/teachers/delete', jsonParser, async (req, res, n
   try {
     Club.findOneAndUpdate(
       { slug: filterSlug },
-      { $pull: { teachers: updateFieldTeacher } },
+      { $pull: { teachers: updateFieldTeacher } }, // Use mongoose operator to remove the
+      // specific teacher from the teachers array
       { new: true },
       (err, club) => {
         if (err) {
@@ -373,4 +389,4 @@ router.delete('/club/slug/:slug/teachers/delete', jsonParser, async (req, res, n
   }
 });
 
-module.exports = router;
+module.exports = router; // export these functions under hthe router object

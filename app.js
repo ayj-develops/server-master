@@ -40,9 +40,9 @@ app.get('/', (req, res) => {
 });
 
 // setup firebase middlware
-// const decodeIdToken = require('./middleware/firebaseAuthHandler');
+const decodeIdToken = require('./middleware/firebaseAuthHandler');
 
-// app.use(decodeIdToken);
+app.use(decodeIdToken);
 
 /* define api routes */
 const userRouter = require('./api/user');
