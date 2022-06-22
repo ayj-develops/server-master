@@ -40,13 +40,9 @@ app.get('/', (req, res) => {
 });
 
 // setup firebase middlware
-const decodeIdToken = require('./middleware/firebaseAuthHandler');
+// const decodeIdToken = require('./middleware/firebaseAuthHandler');
 
-app.use(decodeIdToken);
-
-const handleErrors = require('./middleware/errorHandler');
-
-app.use(handleErrors);
+// app.use(decodeIdToken);
 
 /* define api routes */
 const userRouter = require('./api/user');
@@ -64,6 +60,10 @@ app.use(`${API_ROUTE}/clubs`, clubRouter);
 const postRouter = require('./api/post');
 
 app.use(`${API_ROUTE}/post`, postRouter);
+
+const handleErrors = require('./middleware/errorHandler');
+
+app.use(handleErrors);
 
 // listening to the port
 const PORT = 8000;
