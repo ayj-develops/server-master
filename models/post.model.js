@@ -39,12 +39,7 @@ const PostSchema = new Schema({
         required: true,
         default: 0
     },
-    flairs: {
-        type: [String],
-        important: {type: Boolean, defualt: false},
-        unique: false,
-        required: false,
-    },
+    flairs: String,
     attachment: {
         type: Object,
         required: false,
@@ -55,7 +50,12 @@ const PostSchema = new Schema({
         required: true,
         unique: false,
         default: Date.now
-    }
+    },
+    children: [{
+        type: mongoose.Types.ObjectId,
+        required: false,
+        unique: false
+    }]
 });
 
 const Post = mongoose.model('Post', PostSchema);

@@ -3,9 +3,12 @@ const bodyParser = require('body-parser');
 const { default: mongoose } = require('mongoose');
 const { default: slugify } = require('slugify');
 const Club = require('../models/club.model');
+const User = require('../models/user.model');
+const { getUser, getClub } = require('./miscallenous');
 const {
-  BadRequest, Conflict, NotFound, GeneralError,
+  BadRequest, Conflict, NotFound, GeneralError, Unauthorized, Forbidden
 } = require('../middleware/error');
+const { checkExist } = require('./exist');
 
 const router = express.Router();
 const jsonParser = bodyParser.json();
@@ -13,7 +16,7 @@ const jsonParser = bodyParser.json();
 /**
  * Create a club
  */
-router.post('/club/create', jsonParser, async (req, res, next) => {
+router.post('/create', jsonParser, async (req, res, next) => {
   const newClubFields = {};
   const socialsObject = {};
 
@@ -32,6 +35,13 @@ router.post('/club/create', jsonParser, async (req, res, next) => {
       if (req.body.description.length < 150) newClubFields.description = req.body.description;
       else throw new BadRequest('Character limit exceeded');
     } else throw new BadRequest('Missing required field: Description');
+
+    if (checkExist(req.body.teacher)) {
+      const teacher = await getUser('_id', req.body.teacher);
+      if (teacher.account_type !== 'teacher') throw new Unauthorized('Only teachers are allowed to take this role');
+      else newClubFields.teacher = req.body.teacher;
+    }
+    else throw new BadRequest('Missing required field: Teacher');
 
     if (req.body.clubfest_link) newClubFields.clubfest_link = req.body.clubfest_link;
 
@@ -60,7 +70,7 @@ router.post('/club/create', jsonParser, async (req, res, next) => {
 /**
  * Delete a club by their slug
  */
-router.delete('/club/slug/:slug/delete', jsonParser, async (req, res, next) => {
+router.delete('/slug/:slug/delete', jsonParser, async (req, res, next) => {
   const filterSlug = req.params.slug;
   try {
     Club.findOneAndDelete({ slug: filterSlug }, (err, club) => {
@@ -95,7 +105,7 @@ router.get('/club/id/:id', jsonParser, async (req, res, next) => {
 /**
  * Filter clubs through their slug
  */
-router.get('/club/slug/:slug', jsonParser, async (req, res, next) => {
+router.get('/slug/:slug', jsonParser, async (req, res, next) => {
   const filterSlug = req.params.slug;
   try {
     Club.find({ slug: filterSlug }, (err, club) => {
@@ -132,7 +142,7 @@ router.get('/all', jsonParser, async (req, res, next) => {
  *
  * Does NOT update teacher or execs. Those go through a separate endpoint
  */
-router.put('/club/slug/:slug/update', jsonParser, async (req, res, next) => {
+router.put('/slug/:slug/update', jsonParser, async (req, res, next) => {
   const filterSlug = req.params.slug;
   const updateFields = {};
   const socialsObject = {};
@@ -172,7 +182,7 @@ router.put('/club/slug/:slug/update', jsonParser, async (req, res, next) => {
  *
  * adds club execs
  */
-router.put('/club/slug/:slug/executives/add', jsonParser, async (req, res, next) => {
+router.put('/slug/:slug/executives/add', jsonParser, async (req, res, next) => {
   const filterSlug = req.params.slug;
   let updateFieldExecutive;
   try {
@@ -266,5 +276,180 @@ router.delete('/club/slug/:slug/teachers/delete', jsonParser, async (req, res, n
     next(err);
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+// NEEDS TESTING
+
+
+
+
+
+router.put('/follow', jsonParser, async (req, res, next) => {
+  try {
+    const {clubID, userID} = req.body;
+    if (!checkExist(clubID)) {
+      throw new BadRequest('Missing required field: clubID');
+    }
+    else if (!checkExist(userID)) {
+      throw new BadRequest('Missing required field: userID')
+    }
+    else {
+      const user = await getUser('_id', userID);
+      if (checkExist(user)) {
+        const club = await getClub('_id', clubID);
+        if (checkExist(club)) {
+          console.log(club)
+          club.members.addToSet(userID);
+          club.save().then(() => {
+            user.clubs.addToSet(clubID);
+            user.save().then(() => {
+              res.status(200).json({Message: "Success"});
+            })
+            .catch((err) => {throw new GeneralError(`${err}`, `${err}`)});
+          })
+          .catch((err) => {throw new GeneralError(`${err}, ${err}`)});
+        }
+        else {
+          throw new NotFound('Club not found');
+        }
+      }
+      else {
+        throw new NotFound('User not found')
+      }
+    }
+  }
+  catch (err) {
+    next(err);
+  }
+})
+
+router.put('/unfollow', jsonParser, async (req,res, next) => {
+  try {
+    const {userID, clubID} = req.body;
+    if (!checkExist(userID)) {
+      throw new BadRequest('Missing required field: userID');
+    }
+    else if (!checkExist(clubID)) {
+      throw new BadRequest('Missing required field: clubID');
+    }
+    else {
+      const user = await getUser('_id', userID);
+      if (checkExist(user)) {
+        const club = await getClub('_id', clubID);
+        if (checkExist(club)) {
+          club.members.pull(userID);
+          club.save().then(() => {
+            user.clubs.pull(clubID);
+            user.save().then(() => {
+              res.status(200).json({Message: "Success"});
+            })
+            .catch((err) => {throw new GeneralError(`${err}, ${err}`)})
+          })
+          .catch((err) => {throw new GeneralError(`${err}, ${err}`)});
+        }
+        else {
+          res.status(404).json('Club not found');
+        }
+      }
+      else {
+        res.status(404).json('User not found');
+      }
+    }
+  }
+  catch(err) {next(err)}
+})
+
+
+router.put('/favorite', jsonParser, async (req, res, next) => {
+  try {
+    const {userID, clubID} = req.body;
+    
+    if (!checkExist(userID)) throw new BadRequest('Missing required field: userID');
+    else if (!checkExist(clubID)) throw new BadRequest('Missing required field: clubID');
+
+    else {
+      const user = await getUser('_id', userID);
+      if (checkExist(user)) {
+        const club = await getClub('_id', clubID);
+        if (checkExist(club)) {
+          user.favorite_clubs.addToSet(clubID);
+          user.save().then(() => {
+            res.status(200).json({Message: "Success"});
+          })
+          .catch((err) => {throw new GeneralError(`${err} , ${err}`)})
+        }
+        else throw new NotFound('Club not found');
+      }
+      else throw new NotFound('User not found');
+    }
+  }
+  catch (err) {next(err)};
+});
+
+router.put('/unfavorite', jsonParser, async (req, res, next) => {
+  try {
+    const {userID, clubID} = req.body;
+    
+    if (!checkExist(userID)) throw new BadRequest('Missing required field: userID');
+    else if (!checkExist(clubID)) throw new BadRequest('Missing required field: clubID');
+
+    else {
+      const user = await getUser('_id', userID);
+      if (checkExist(user)) {
+        const club = await getClub('_id', clubID);
+        if (checkExist(club)) {
+          user.favorite_clubs.pull(clubID);
+          user.save().then(() => {
+            res.status(200).json({Message: "Success"});
+          })
+          .catch((err) => {throw new GeneralError(`${err} , ${err}`)})
+        }
+        else throw new NotFound('Club not found');
+      }
+      else throw new NotFound('User not found');
+    }
+    const user = await getUser('_id', userID)
+  }
+  catch (err) {next(err)};
+})
+
+router.put('/add-flair', jsonParser, async (req, res, next) => {
+  try {
+    const {admin, flair, club} = req.body;
+    if (!checkExist(admin)) throw new BadRequest('Missing required field: admin');
+    else if (!checkExist(flair)) throw new BadRequest('Missing required field: flair');
+    else if (!checkExist(club)) throw new BadRequest('Missing required field: club');
+    else {
+      const user = await getUser('_id', admin);
+      if (checkExist(user)) {
+        const tmpClub = await getClub('_id', club);
+        if (checkExist(tmpClub)) {
+          if (checkExist(tmpClub.execs.find(admin)) || tmpClub.teacher===admin) {
+            if (checkExist(tmpClub.flairs.find(flair))) throw new Conflict('Resource conflict: flair already exists');
+            else {
+              tmpClub.flairs.addToSet(flair);
+              tmpClub.save().then(() => {res.status(200).json({Message: "Success"})})
+              .catch((err) => {throw new GeneralError(`${err}`, `${err}`)})
+            }
+          }
+          else throw new Forbidden('You are not authorized to this operation');
+        }
+        else throw new NotFound('Club not found');
+      }
+      else throw new NotFound('User not found');
+    }
+  }
+  catch(err) {next(err)}
+})
+
 
 module.exports = router;

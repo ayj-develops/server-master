@@ -68,7 +68,7 @@ const UserSchema = new Schema({
         expires: 4*365*24*60
     },
     liked: [{
-        type: Number,
+        type: mongoose.Types.ObjectId,
         required: false,
         unique: false
     }]

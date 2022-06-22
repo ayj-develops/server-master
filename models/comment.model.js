@@ -23,7 +23,12 @@ const CommentSchema = new Schema({
         unique: false,
         default: Date.now,
         expires: 4*365*24*60
-    }
+    },
+    children: [{
+        type: mongoose.Types.ObjectId,
+        required: false,
+        unique: false
+    }]
 });
 
 const Comment = mongoose.model('Comment', CommentSchema);
