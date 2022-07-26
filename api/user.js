@@ -1,109 +1,360 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const hash = require('object-hash');
-const User = require('../models/user.model');
-const { checkExist } = require('./exist');
+/**
+ * Date: June 23, 2022
+ * Description:
+ * Collection of endpoitns that can query & create User objects & other features that include other objects i.e. following clubs
+ */
 
+
+//Imports
+const express = require('express'); // express server
+const bodyParser = require('body-parser'); // better parse the request
+const hash = require('object-hash'); // hash functions for encryption
+const mongoose = require('mongoose'); // ORM for mongodb driver
+
+// mongo schemas
+const User = require('../models/user.model');
+const Club = require('../models/club.model');
+const Comment = require('../models/comment.model');
+const Post = require('../models/post.model');
+
+// other modules
+const { checkExist } = require('./exist'); // existential validation
+const { getUser, getPost, getComment } = require('./miscallenous'); // getters for reqpective schema objects
+const { NotFound, BadRequest, Conflict, GeneralError, Forbidden } = require('../middleware/error'); // error handling middleware
+
+/**
+ * Define a router for this collection of api endpoints
+ * @type {express.Router}
+ */
 const router = express.Router();
+/**
+ * Use json parsing middleware
+ * @type {import('body-parser').json()}
+ * */
 const jsonParser = bodyParser.json();
 
-// TODO: Secure endpoint
-// Registers the user
 
-router.post('/create', jsonParser, async (req, res) => {
-  let { email } = req.body;
-  // do not await when querying mongoose
-  if (!checkExist(email)) {
-    res.status(400).send({ Message: 'Email parameter is missing' });
-  } else if (!email.includes('tdsb.on.ca')) {
-    res.status(400).json({ Message: 'Non TDSB users are not allowed' });
-  } else {
-    email = hash(email, { algorithm: 'sha1' });
-    User.findOne({ email }, (err, user) => {
-      if (err) res.status(500).json({ Message: 'Error' });// some error the server encounters
-      else if (user) res.status(400).json({ Message: 'Email is already in use' }); // if user exists then that means the email is taken
-      else {
-        // Create a new user
-        const newUser = new User({ email });
-        newUser.save()
-          .then(() => {
-            res.status(201).json({ Message: 'Success' });
-          })
-          .catch((err) => res.status(500).json({ Message: 'Server Error', Error: `${err}` }));
-      }
-    });
-  }
-});
-
-router.get('/', jsonParser, async (req, res) => {
-  if ((req.query._id === null || req.query._id === undefined)
-    && (req.query.email === null || req.query.email === undefined)) {
-    res.status(200).send(await User.find());
-  } else if ((req.query._id === null || req.query._id === undefined) && req.query.email) {
-    User.findOne(({ email: req.query.email }), (err, user) => {
-      if (err) {
-        res.status(500).send({ Message: 'Error' });
-      } else if (user === null) {
-        res.status(400).send({ Message: 'User not found' });
-      } else {
-        res.status(200).send(user);
-      }
-    });
-  } else if ((req.query.email === null || req.query.email === undefined) && req.query._id) {
-    User.findById((req.query._id), (err, user) => {
-      if (err) {
-        res.status(500).send({ Message: 'Error' });
-      } else if (user === null) {
-        res.status(400).send({ Message: 'User not found' });
-      } else {
-        res.status(200).send(user);
-      }
-    });
-  }
-});
-
-router.delete('/delete', jsonParser, async (req, res) => {
-  let { email } = req.body;
-  email = hash(email, { algorithm: 'sha1' });
-  User.findOne({ email }, (err, user) => {
-    if (err) {
-      res.status(500).send({ Message: 'Error' });
-    } else if (user === null) {
-      res.status(400).send({ Message: 'User not found' });
-    } else {
-      User.findOneAndDelete({ email }, (err, user) => {
-        if (err) res.status(500).json({ Message: 'Error' });
+/**
+ * Creates a new user document via '/create/ endpoint
+ * Errors will be handled by error handling middleware via @property {next}
+ * @see handleErrors
+ * 
+ * 
+ * @property {string} email                      -> Required field in the request body, will be hashed & stored for checksums & validation/ID
+ *                                                  Must be within the TDSB domain
+ * 
+ * 
+ * @returns {user} -> JSON representation of the created club object from mongodb
+ */
+router.post('/create', jsonParser, async (req, res, next) => {
+    try {
+        const newUserField = {};
+        /**
+         * Filters the fields to add to new object consisting of the new User fields
+         */
+        if (!checkExist(req.body.email)) {
+            throw new BadRequest('Missing required field: email');
+        }
+        else if (!req.body.email.includes('tdsb.on.ca')) { // checks if email is part of TDSB organization
+            throw new Forbidden('Only TDSB users are allowed');
+        }
         else {
-          res.status(200).send({ Message: 'Success', user });
-        }
-      });
-    }
-  });
-});
+            newUserField.account_type = req.body.email.includes("@tdsb.on.ca") ? "teacher" : "student"; // based on format of email, an account type will be automatically assigned which dictates perms
+            newUserField.email = hash(req.body.email, {algorithm: 'sha1'}); // hashes the email to store
+            newUserField.pfp = req.body.pfp;
+            /**
+             * Fetch whether the user exists or not using the slug
+             *
+             * @property {string} param -> the param to search with within object
+             *
+             * @property {string} value -> the value of the param
+             * 
+             * 
+             * @returns {User || null}         -> The club object or null
+             */
+            if (!checkExist(await getUser('email', newUserField.email))) { // checks for dupliate resources before finally executing creation instruction
+                /**
+                 * Using mongoose, create a new User with the User schema
+                 *
+                 * @see User
+                 * @returns {User} user -> the user object or an error
+                 */
+                User.create(newUserField, (err, user) => {
+                    if (err) throw new GeneralError(`${err}`, `${err}`);
+                    else res.status(201).send(user);
+                })
+            }
 
-router.put('/update', jsonParser, async (req, res) => {
-  const { _id, pfp } = req.body;
-  User.findById({ _id }, async (err, user) => {
-    if (_id === undefined) {
-      res.status(400).send({ Message: 'Id parameter missing' });
-    } else if (err) {
-      res.status(500).send({ Message: 'Error' });
-    } else if (user === null) {
-      res.status(400).send({ Message: 'User not found' });
-    } else if (_id !== user._id) {
-      res.status(400).send({ Message: 'You are not this user' });
-    } else {
-      User.findByIdAndUpdate({ _id }, { pfp }, (err, user) => {
-        if (err) {
-          res.status(500).send({ Message: 'Error' });
-        } else if (user) {
-          res.status(400).send({ Message: 'User not found' });
-        } else {
-          res.status(200).send({ Message: 'Success' });
+            else {
+                res.status(404).json({Message: "User already exists"})
+            }
         }
-      });
     }
-  });
-});
+    catch(err) {next(err);} // passes any error caught within the code body above to the middleware
+})
+
+
+
+
+/**
+ * Filter users through the User object id or hashed email
+ *
+ * @property {string} id -> id is the unique identifier autogenerated by mongodb
+ * @property {string} email -> the unique hashed email
+ * 
+ * @return {User} User   -> the user that contains this id/email or an array of the entire schema
+ */
+router.get('/', jsonParser, async (req, res, next) => {
+    try {
+        const {_id} = req.query;
+        if (!checkExist(_id) && !checkExist(req.query.email)) { // defaults to returning the entire schema if no object id or email is found in query
+            res.status(200).json(await User.find());
+        }
+        else if (checkExist(req.query._id)) {
+            /**
+             * Using mongoose, query the document with matching object ids
+             *
+             * @see User
+             * @returns {User} user -> the user object or an error
+             */
+            User.findById({ _id }, async (err, user) => {
+                if (err) throw new GeneralError(`${err}, ${err}`);
+                else if (!checkExist(user)) throw new NotFound('User not found');
+                else res.status(200).json(user);
+            })
+        }
+        else {
+            /**
+             * Query using mongoose find to find the user object
+             * @return {User} user -> the json representation of the user
+             */
+            const {email} = req.query;
+            /**
+             * Using mongoose, query the document with matching emails
+             *
+             * @see User
+             * @returns {User} user -> the user object or an error
+             */
+            User.findOne({ email : req.query.email}, async (err, user) => {
+                if (err) throw new GeneralError(`${err}, ${err}`);
+                else if (!checkExist(user)) throw new NotFound('User not found');
+                else res.status(200).json(user);
+            })
+        }
+    }
+    catch (err) {next(err);} // passes any caught errors to middleware
+})
+
+/**
+ * Likes an article (post/comment), adding said article to their liked list & increments the article's like count
+ * 
+ * 
+ * @property {mongoose.Types.ObjectId} userID -> object id of user liking the article
+ * @property {mongoose.Types.ObjectId} articleID -> object id of article to be liked
+ * 
+ */
+router.put('/like', jsonParser, async (req, res, next) => {
+    try {
+      const {userID, articleID} = req.body;
+      /**
+       * first ensure the fields required exist & are valid/filled
+       * Otherwise return a 400 BadRequest
+       */
+      /**
+       * checkExist: checks if an object exists or not
+       * 
+       * @property {Any} variable -> variable to check
+       * 
+       * @return {boolean} exists -> returns existence of object
+       */
+      if (!checkExist(userID)) throw new BadRequest('Missing required field: userID');
+      else if (!checkExist(articleID)) throw new BadRequest('Missing required field: articleID');
+      else {
+        /**
+         * gets user object with specified params & values
+         * 
+         * @property {String} param -> param to query with
+         * @property {String} value -> value of param to query
+         * 
+         * @return {User} User -> the matching user object or null
+         */
+        const user = await getUser('_id', userID); // fetches user with object id
+        if (checkExist(user)) { // check if user is null, indicating whether exists or not
+            /**
+             * getPost: returns a Post object that matches queried fields & values
+             * 
+             * @property {String} param -> param to identify with value
+             * @property {String} value -> value of param to query for object
+             * 
+             * 
+             * @return {Post} Post -> returns a matching Post object or null if no matches
+             */
+          const post = await getPost('_id', articleID); // repeats same but with article, this time querying both Comments & Posts
+          if (checkExist(post)) {
+            if (user.liked.includes(articleID)) throw new Conflict('Resource conflict: Article is already liked'); // checks if user already liked the post to prevent liking it again
+            else {
+                user.liked.addToSet(articleID);
+                /**
+                 * Saves the object using JS syntax after adding post id to liked array
+                 */
+                user.save().then(() => {
+                    post.likes++; // now increments the likes field of post
+                    /**
+                     * Now saves it
+                     */
+                    post.save().then(() => {res.status(200).send({Message: "Success"})})
+                    .catch((err) => {throw new GeneralError(`${err}, ${err}`)});
+                })
+                .catch((err) => {throw new GeneralError(`${err}, ${err}`)});
+            }
+          }
+          //check comment now
+          else {
+            //repeats above code body but with Comment this time
+            /**
+             * getComment: returns a Comment object that matches queried fields & values
+             * 
+             * @property {String} param -> param to identify with value
+             * @property {String} value -> value of param to query for object
+             * 
+             * 
+             * @return {Comment} Comment -> returns a matching Comment object or null if no matches
+             */
+            const comment = await getComment('_id', articleID);
+            if (checkExist(comment)) { // checks if comment exists
+                if (user.liked.includes(articleID)) throw new Conflict('Resource conflict: Article is already liked'); // throws a new conflict error if comment is already in liked array
+                else {
+                    user.liked.addToSet(articleID);
+                    /**
+                     * Adds comment to liked array, then saves it via JS syntax
+                     */
+                    user.save().then(() => {
+                        /**
+                         * Now increments said comment's like counter, then saves it
+                         */
+                        comment.likes++;
+                        comment.save().then(() => {res.status(200).send({Message: "Success"})})
+                        .catch((err) => {throw new GeneralError(`${err}, ${err}`)});
+                    })
+                    .catch((err) => {throw new GeneralError(`${err}, ${err}`)});
+                }
+            }
+            else throw new NotFound('Article not found');
+          }
+        }
+        else throw new NotFound('User not found');
+      }
+    }
+    catch(err) {next(err)} // passes any errors caught to middleware
+  })
+
+  /**
+   * Basically above, but it is the reverse
+   */
+  /**
+ * Unlikes an article (post/comment), removing said article from their liked list & decrements the article's like count
+ * 
+ * 
+ * @property {mongoose.Types.ObjectId} userID -> object id of user unliking the article
+ * @property {mongoose.Types.ObjectId} articleID -> object id of article to be unliked
+ * 
+ */
+router.put('/unlike', jsonParser, async (req, res, next) => {
+    try {
+        const {userID, articleID} = req.body;
+        /**
+       * first ensure the fields required exist & are valid/filled
+       * Otherwise return a 400 BadRequest
+       */
+      /**
+       * checkExist: checks if an object exists or not
+       * 
+       * @property {Any} variable -> variable to check
+       * 
+       * @return {boolean} exists -> returns existence of object
+       */
+        if (!checkExist(userID)) throw new BadRequest('Missing required field: userID');
+        else if (!checkExist(articleID)) throw new BadRequest('Missing required field: articleID');
+        else {
+          const user = await getUser('_id', userID);//fetches user with object id
+          /**
+            * gets user object with specified params & values
+            * 
+            * @property {String} param -> param to query with
+            * @property {String} value -> value of param to query
+            * 
+            * @return {User} User -> the matching user object or null
+            */
+          if (checkExist(user)) { // check if user is null, indicating whether exists or not
+            /**
+             * getPost: returns a Post object that matches queried fields & values
+             * 
+             * @property {String} param -> param to identify with value
+             * @property {String} value -> value of param to query for object
+             * 
+             * 
+             * @return {Post} Post -> returns a matching Post object or null if no matches
+             */
+            const post = await getPost('_id', articleID); // repeats same but with article, this time querying both Comments & Posts
+            if (checkExist(post)) {
+              if (!user.liked.includes(articleID)) throw new NotFound('Post not found');// throws a NotFound if this post is not liked by this user yet, to prevent unliking a post that isn't liked
+              else {
+                /**
+                 * Saves the object using JS syntax after removing post id from liked array
+                 */
+                  user.liked.pull(articleID);
+                  user.save().then(() => { // now decrements the likes field of post
+                    /**
+                     * Now saves it
+                     */
+                      post.likes--;
+                      post.save().then(() => {res.status(200).send({Message: "Success"})})
+                      .catch((err) => {throw new GeneralError(`${err}, ${err}`)});
+                  })
+                  .catch((err) => {throw new GeneralError(`${err}, ${err}`)});
+              }
+            }
+            //check comment now
+            else {
+                //repeats above code body but with Comment this time
+                /**
+                 * getComment: returns a Comment object that matches queried fields & values
+                 * 
+                 * @property {String} param -> param to identify with value
+                 * @property {String} value -> value of param to query for object
+                 * 
+                 * 
+                 * @return {Comment} Comment -> returns a matching Comment object or null if no matches
+                 */
+              const comment = await getComment('_id', articleID); // gets comment via object id
+              console.log(comment);
+              if (checkExist(comment)) { // checks if comment exists
+                  if (!user.liked.includes(articleID)) throw new NotFound('Comment not found'); // throws a NotFound if comment is not in user's liked array, to prevent unliking a comment that isn't liked
+                  else {
+                      user.liked.pull(articleID);
+                      /**
+                       * Removes comment from liked array, then saves it via JS syntax
+                       */
+                      user.save().then(() => {
+                          comment.likes--;
+                          /**
+                           * Now increments said comment's like counter, then saves it
+                           */
+                          comment.likes++;
+                          comment.save().then(() => {res.status(200).send({Message: "Success"})})
+                          .catch((err) => {throw new GeneralError(`${err}, ${err}`)});
+                      })
+                      .catch((err) => {throw new GeneralError(`${err}, ${err}`)});
+                  }
+              }
+              else throw new NotFound('Article not found');
+            }
+          }
+          else throw new NotFound('User not found');
+        }
+      }
+      catch(err) {next(err);}// passes any errors caught to middleware
+})
+
 
 module.exports = router;
