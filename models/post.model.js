@@ -6,6 +6,9 @@ const { ObjectId } = require('mongodb');
 
 const { Schema } = mongoose;
 
+// TODO: Temporarily use barebones schema to recieve json
+// data until we figure out how to handle mongodb schema validations
+
 const PostSchema = new Schema({
     title: {
         type: String,
@@ -57,6 +60,38 @@ const PostSchema = new Schema({
         unique: false
     }]
 });
+
+// const PostSchema = new Schema({
+//   title: {
+//     type: String,
+//     required: true,
+//     minlength: 3,
+//     maxlength: 30,
+//   },
+//   slug: {
+//     type: String,
+//     required: true,
+//   },
+//   body: {
+//     type: String,
+//     required: false,
+//     unique: false,
+//     minlength: 1,
+//     maxlength: 500,
+//   },
+//   author: {
+//     type: String,
+//     required: true,
+//   },
+//   image: {
+//     type: Object,
+//     required: false,
+//   },
+//   club: {
+//     type: String,
+//     required: true,
+//   },
+// });
 
 const Post = mongoose.model('Post', PostSchema);
 

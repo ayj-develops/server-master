@@ -8,9 +8,9 @@ const { getUser, getPost, getClub } = require('./miscallenous');
 const { BadRequest, NotFound, Forbidden, GeneralError, Conflict } = require('../middleware/error');
 const mongoose = require('mongoose');
 
+
 const router = express.Router();
 const jsonParser = bodyParser.json();
-
 
 router.post('/create', jsonParser, async (req, res, next) => {
   const newPostFields = {};
@@ -97,16 +97,10 @@ router.delete('/delete', jsonParser, async (req, res) => {
       } else if (post.author !== author) {
         res.status(400).send({ Message: 'You are not OP' });
       } else {
-        Post.findByIdAndDelete({ _id }, (err, post) => {
-          if (err) {
-            res.status(500).send({ Message: 'Error' });
-          } else {
-            res.status(200).send({ Message: 'Success' });
-          }
-        });
+        throw new BadRequest('Bad Request', `${err}`);
       }
     });
-  }
+  } catch (err) { next(err); }
 });
 
 router.delete('/delete', jsonParser, async (req, res) => {
@@ -125,85 +119,91 @@ router.delete('/delete', jsonParser, async (req, res) => {
       } else if (post.author !== author) {
         res.status(400).send({ Message: 'You are not OP' });
       } else {
-        Post.findByIdAndDelete({ _id }, (err, comment) => {
-          if (err) {
-            res.status(500).send({ Message: 'Error' });
-          } else {
-            res.status(200).send({ Message: 'Success' });
-          }
-        });
+        throw new BadRequest('Bad Request', `${err}`);
       }
     });
-  }
+  } catch (err) { next(err); }
 });
 
-router.delete('/delete', jsonParser, async (req, res) => {
-  const { _id } = req.body;
-  if (!exist.checkExist(_id)) {
-    res.status(400).send({ Message: 'ID params are missing' });
-  } else if (!exist.checkExist(req.body.author)) {
-    res.status(400).send({ Message: 'Author params are missing' });
-  } else {
-    const author = hash(req.body.author, { algorithm: 'sha1' });
-    Post.findById({ _id }, (err, post) => {
+/**
+ * Delete club through :slug
+ */
+router.delete('/slug/:slug/delete', jsonParser, async (req, res, next) => {
+  const filterSlug = req.params.slug;
+  try {
+    Post.findOneAndDelete({ slug: filterSlug }, (err, post) => {
       if (err) {
-        res.status(500).send({ Message: 'Error' });
-      } else if (post === null) {
-        res.status(400).send({ Message: 'Post not found' });
-      } else if (post.author !== author) {
-        res.status(400).send({ Message: 'You are not OP' });
-      } else {
-        Post.findByIdAndDelete({ _id }, (err, post) => {
-          if (err) {
-            res.status(500).send({ Message: 'Error' });
-          } else {
-            res.status(200).send({ Message: 'Success' });
-          }
-        });
-      }
+        throw new BadRequest('Bad Request', `${err}`);
+      } else if (!checkExist(post)) throw new NotFound(`Not found: ${filterSlug}`);
+      else res.status(200).send(post);
     });
-  }
+  } catch (err) { next(err); }
 });
 
-router.put('/update', jsonParser, async (req, res) => {
-  let {
-    _id, title, body, image, author,
-  } = req.body;
+/**
+ * update post by fetching through id
+ */
+router.put('/id/:id/update', jsonParser, async (req, res, next) => {
+  const filterId = req.params.id;
+  const updateFields = {};
 
-  // check for required params
-  if (!exist.checkExist(_id)) {
-    res.status(400).send({ Message: 'Id parameter missing' });
-  } else if (!exist.checkExist(author)) {
-    res.status(400).send({ Message: 'Author parameter is missing' });
-  } else {
-    author = hash(author, { algorithm: 'sha1' });
-    Post.findById({ _id }, (err, post) => {
-      if (err) {
-        res.status(500).send({ Message: 'Error' });
-      } else if (post === null) {
-        res.status(400).send({ Message: 'Post not found' });
-      } else if (post.author !== author) {
-        res.status(400).send({ Message: 'You are not the author of this post' });
-      } else {
-        if (exist.checkExist(title)) {
-          title = post.title;
+  try {
+    if (req.body.title) {
+      updateFields.title = req.body.title;
+      const slug = slugify(req.body.title, { lower: true });
+      updateFields.slug = slug;
+    }
+    if (req.body.body) updateFields.body = req.body.body;
+    if (req.body.author) updateFields.author = req.body.author;
+    if (req.body.image) updateFields.image = req.body.image;
+    if (req.body.club) updateFields.club = req.body.club;
+
+    Post.findOneAndUpdate(
+      { _id: mongoose.mongo.ObjectId(filterId) },
+      updateFields,
+      { new: true },
+      (err, club) => {
+        if (err) throw new GeneralError(`${err}`, `${err}`);
+        else if (checkExist(club)) throw new NotFound(`Not found: ${filterId}`);
+        else {
+          res.status(200).send(club);
         }
-        if (exist.checkExist(body)) {
-          body = post.body;
+      },
+    );
+  } catch (err) { next(err); }
+});
+
+/**
+ * update post by fetching through slug
+ */
+router.put('/slug/:slug/update', jsonParser, async (req, res, next) => {
+  const filterSlug = req.params.id;
+  const updateFields = {};
+
+  try {
+    if (req.body.title) {
+      updateFields.title = req.body.title;
+      const slug = slugify(req.body.title, { lower: true });
+      updateFields.slug = slug;
+    }
+    if (req.body.body) updateFields.body = req.body.body;
+    if (req.body.author) updateFields.author = req.body.author;
+    if (req.body.image) updateFields.image = req.body.image;
+    if (req.body.club) updateFields.club = req.body.club;
+
+    Post.findOneAndUpdate(
+      { slug: filterSlug },
+      updateFields,
+      { new: true },
+      (err, club) => {
+        if (err) throw new GeneralError(`${err}`, `${err}`);
+        else if (checkExist(club)) throw new NotFound(`Not found: ${filterSlug}`);
+        else {
+          res.status(200).send(club);
         }
-        if (exist.checkExist(image)) {
-          image = post.image;
-        }
-        Post.findByIdAndUpdate({ _id }, { title, body, image }, (err, post) => {
-          if (err) {
-            res.status(500).send({ Message: 'Error' });
-          } else {
-            res.status(200).send({ Message: 'Success' });
-          }
-        });
-      }
-    });
-  }
+      },
+    );
+  } catch (err) { next(err); }
 });
 
 

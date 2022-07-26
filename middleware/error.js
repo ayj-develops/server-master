@@ -32,11 +32,17 @@ class GeneralError extends Error {
 
 // Error Classes
 
+/** */
 class BadRequest extends GeneralError { }
+/** */
 class Conflict extends GeneralError { }
+/** */
 class Unauthorized extends GeneralError { }
+/** */
 class Forbidden extends GeneralError { }
+/** */
 class TooManyRequests extends GeneralError { }
+/** */
 class NotFound extends GeneralError { }
 
 module.exports = {
