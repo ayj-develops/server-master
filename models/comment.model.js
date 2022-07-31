@@ -1,21 +1,26 @@
 const mongoose = require('mongoose');
 
-const Post = require('./post.model');
-const User = require('./user.model');
-
 const { Schema } = mongoose;
 
+// https://www.mongodb.com/docs/manual/tutorial/model-tree-structures-with-parent-references/
+
 const CommentSchema = new Schema({
+  postParent: {
+    type: mongoose.Types.ObjectId,
+    ref: 'Post',
+  },
   parent: {
     type: mongoose.Types.ObjectId,
-    required: true,
-    unique: false,
+    ref: 'Comment',
   },
   author: {
     type: mongoose.Types.ObjectId,
     required: true,
     unique: false,
     ref: 'User',
+  },
+  body: {
+    type: String,
   },
   createdAt: {
     type: Date,
@@ -24,11 +29,10 @@ const CommentSchema = new Schema({
     default: Date.now,
     expires: 4 * 365 * 24 * 60,
   },
-  children: [{
-    type: mongoose.Types.ObjectId,
+  deletedMessage: {
+    type: String,
     required: false,
-    unique: false,
-  }],
+  },
 });
 
 const Comment = mongoose.model('Comment', CommentSchema);

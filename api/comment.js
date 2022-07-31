@@ -1,70 +1,115 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const hash = require('object-hash');
-const { checkExist } = require('./exist');
+const { checkExist } = require('../utils/exist');
+const { BadRequest, GeneralError } = require('../middleware/error');
+const Comment = require('../models/comment.model');
 
 const router = express.Router();
 const jsonParser = bodyParser.json();
 
-router.post('/create', jsonParser, async (req, res) => {
-  let { name, body, parent } = req.body;
-  // do not await when querying mongoose
-  if (!checkExist(name) || !checkExist(body) || !checkExist(parent)) {
-    res.status(400).send({ Message: 'Missing params' });
-  } else if (req.body.body.length > 500) {
-    res.status(400).json({ Message: 'Word limit exceeded' });
-  } else {
-    name = hash(name, { algorithm: 'sha1' });
-    const newComment = new Comment({ name, body, parent });
-    newComment.save().then(() => {
-      res.status(201).json({ Message: 'Success' });
-    })
-      .catch((err) => res.status(500).json({ Message: 'Server Error', Error: `${err}` }));
-  }
-});
+/** create a new comment */
+router.post('/create', jsonParser, async (req, res, next) => {
+  const {
+    author: userId,
+    post: postId,
+    body: commentBody,
+    parent: parentCommentId,
+  } = req.body;
 
-router.delete('/delete', jsonParser, async (req, res) => {
-  let { _id, name } = req.body;
-  name = hash(name, { algorithm: 'sha1' });
-  User.findById({ _id }, (err, comment) => {
-    if (err) {
-      res.status(500).send({ Message: 'Error' });
-    } else if (!checkExist(comment)) {
-      res.status(400).send({ Message: 'Comment not found' });
-    } else if (comment.name !== name) {
-      res.status(400).send({ Message: 'This is not your comment' });
-    } else {
-      User.findByIdAndDelete({ _id }, (err, comment) => {
-        if (err) res.status(500).json({ Message: 'Error' });
-        else {
-          res.status(200).send({ Message: 'Success' });
-        }
-      });
-    }
-  });
-});
+  try {
+    if (!checkExist(userId)) throw new BadRequest('Missing required field: author');
+    if (!checkExist(commentBody)) throw new BadRequest('Missing required field: body');
 
-router.get('/', jsonParser, async (req, res) => {
-  if (!checkExist(req.query._id)) {
-    res.status(200).send(await Comment.find());
-  } else {
-    const { _id } = req.body;
-    Comment.findById({ _id }, async (err, comment) => {
-      if (err) {
-        res.status(500).send({ Message: 'Error' });
-      } else if (comment === null) {
-        res.status(400).send({ Message: 'Comment not found' });
-      } else {
-        res.status(200).send(comment);
-      }
+    let _parentCommentId = null;
+    if (checkExist(parentCommentId)) _parentCommentId = parentCommentId;
+    const newComment = new Comment({
+      author: userId,
+      postParent: postId,
+      body: commentBody,
+      parent: _parentCommentId,
     });
+
+    newComment.save().then(() => {
+      res.status(201).send(newComment);
+    }).catch((err) => {
+      if (err) throw new GeneralError('Server Error', `Error: ${err}`);
+    });
+  } catch (err) {
+    next(err);
   }
 });
 
-router.put('/update', jsonParser, async (req, res) => {
-  const { _id, body } = req.body;
-  if (!checkExist(_id)) {
-    res.status(400).send({ Message: '_id param is missing' });
+/** deletes a comment (only obscures public facing comment) */
+router.delete('/delete', jsonParser, async (req, res, next) => {
+  const {
+    user_id: userId,
+    comment: commentId,
+  } = req.body;
+
+  // TODO: Secure with role based permissions (only ADMIN can delete, excludes club execs)
+
+  try {
+    const currCommentBody = Comment.findOne({ _id: commentId }).body;
+
+    Comment.findOneAndUpdate(
+      { _id: commentId },
+      { body: 'This comment has been deleted', deletedMessage: currCommentBody },
+      { new: true },
+      (err, comment) => {
+        if (err) throw new GeneralError('Server Error', `${err}`);
+        else {
+          res.status(200).send(comment);
+        }
+      },
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** retrieve comments from post */
+router.get('/', jsonParser, async (req, res, next) => {
+  const { post: postId } = req.body;
+
+  const postComments = [];
+
+  try {
+    if (!checkExist(postId)) throw new BadRequest('Missing required field: post');
+    Comment.find({ post_parent: postId }, (err, comments) => {
+      if (err) throw new GeneralError('Server Error', `${err}`);
+      comments.forEach((comment) => {
+        postComments.push(comment);
+      });
+      res.status(200).send(postComments);
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** update a comment */
+router.put('/update', jsonParser, async (req, res, next) => {
+  const {
+    user_id: userId,
+    author: authorId,
+    comment: commentId,
+    body: newCommentBody,
+  } = req.body;
+
+  try {
+    if (!checkExist(commentId)) throw new BadRequest('Missing required field: comment');
+    if (!checkExist(newCommentBody)) throw new BadRequest('Missing required field: body');
+    Comment.findOneAndUpdate(
+      { _id: commentId },
+      { body: newCommentBody },
+      { new: true },
+      (err, comment) => {
+        if (err) throw new GeneralError('Server Error', `${err}`);
+        res.status(200).send(comment);
+      },
+    );
+  } catch (err) {
+    next(err);
   }
 });
 
