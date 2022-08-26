@@ -1,19 +1,23 @@
 const express = require('express');
 
 const router = express.Router();
-const Club = require('../models/club');
+const Club = require('../models/club.model');
+const { BadRequestError, NotFoundError, GeneralError } = require('../middleware/errorHandler');
+const { checkExist } = require('../utils/exist');
+const { slugit } = require('../utils/stringUtils');
 
-router.get('/', (req, res, next) => {
+// GET /api/v0/clubs/
+router.get('/', (_req, res, next) => {
   Club.find()
     .then((clubs) => {
-      res.status(200).json(clubs);
+      res.status(200).json({ ok: 'true', clubs });
     })
     .catch((err) => {
       next(err);
     });
 });
 
-
+// POST /api/v0/clubs/create
 router.post('/create', (req, res, next) => {
   const {
     name: clubName,
@@ -25,50 +29,225 @@ router.post('/create', (req, res, next) => {
     teacher: clubTeacher,
   } = req.body;
 
-  if (!clubName || !clubDescription || !clubTeacher) {
-    const err = new BadRequest('Missing fields');
-    err.status = 400;
-    next(err);
+  if (!checkExist(clubName) || !checkExist(clubDescription) || !checkExist(clubTeacher)) {
+    throw new BadRequestError('bad_parameter', 'Missing required fields');
   }
 
-  const socialsObject = {
-    instagram: clubInstagram,
-    google_classroom_code: clubGoogleClasroomCode,
-    signup_link: clubSignupLink,
-  };
+  const socialsObject = {};
 
   const clubObject = {
     name: clubName,
+    slug: slugit(clubName),
     description: clubDescription,
     socials: socialsObject,
     clubfest_link: clubClubfestLink,
     teacher: clubTeacher,
   };
 
-  if (clubDescription.length < 50 || clubDescription.length > 500) {
-    const err = new Error('Club description must be between 50 and 500 characters long');
-    err.status = 400;
-    next(err);
-  } else {
-    Club.create({
+  if (checkExist(clubInstagram)
+    || checkExist(clubGoogleClasroomCode) || checkExist(clubSignupLink)) {
+    clubObject.socials = {
+      instagram: clubInstagram,
+      google_classroom_code: clubGoogleClasroomCode,
+      signup_link: clubSignupLink,
+    };
+  }
 
-    })
+  if (clubDescription.length < 50 || clubDescription.length > 500) {
+    throw new BadRequestError('exceeded_char', 'Description must be between 50 and 500 characters');
+  } else {
+    Club.create(clubObject)
       .then((club) => {
-        res.status(201).json(club);
-      })
-      .catch((err) => {
+        res.status(200).json({
+          ok: 'true',
+          club,
+        });
+      }).catch((err) => {
         next(err);
       });
   }
 });
 
-// write a function to get a single club and handle errors with the error handler middleware
+// clubs/:id
 router.get('/:id', (req, res, next) => {
-  Club.findById(req.params.id)
-    .then((club) => {
-      res.status(200).json(club);
-    })
-    .catch((err) => {
-      next(err);
-    });
+  try {
+    Club.findById(req.params.id)
+      .then((club) => {
+        res.status(200).json(club);
+      })
+      .catch((err) => {
+        throw new NotFoundError('not_found', `Club ${req.params.id} not found: ${err}`);
+      });
+  } catch (err) {
+    next(err);
+  }
 });
+
+// PUT /api/v0/clubs/:id/update
+router.put('/:id/update', (req, res, next) => {
+  try {
+    const {
+      name: clubName,
+      description: clubDescription,
+      instagram: clubInstagram,
+      google_classroom_code: clubGoogleClasroomCode,
+      signup_link: clubSignupLink,
+      clubfest_link: clubClubfestLink,
+      teacher: clubTeacher,
+    } = req.body;
+
+    if (!checkExist(clubName) || !checkExist(clubDescription) || !checkExist(clubTeacher)) {
+      throw new BadRequestError('bad_parameter', 'Missing required fields');
+    }
+    const socialsObject = {};
+    const clubObject = {
+      name: clubName,
+      slug: slugit(clubName),
+      description: clubDescription,
+      socials: socialsObject,
+      clubfest_link: clubClubfestLink,
+      teacher: clubTeacher,
+    };
+    if (checkExist(clubInstagram)
+      || checkExist(clubGoogleClasroomCode) || checkExist(clubSignupLink)) {
+      clubObject.socials = {
+        instagram: clubInstagram || Club.findOne({ _id: req.params.id }).socials.instagram,
+        google_classroom_code: clubGoogleClasroomCode
+          || Club.findOne({ _id: req.params.id }).socials.google_classroom_code,
+        signup_link: clubSignupLink || Club.findOne({ _id: req.params.id }).socials.signup_link,
+      };
+    }
+    if (clubDescription.length < 50 || clubDescription.length > 500) {
+      throw new BadRequestError('exceeded_char', 'Description must be between 50 and 500 characters');
+    } else {
+      Club.findByIdAndUpdate(req.params.id, clubObject, { new: true })
+        .then((club) => {
+          res.status(200).json({ ok: 'true', club });
+        }).catch((err) => {
+          throw new GeneralError('server_error', `Server error: ${err}`);
+        });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/v0/clubs/:id/delete
+router.delete('/:id/delete', (req, res, next) => {
+  try {
+    Club.findByIdAndRemove(req.params.id)
+      .then((club) => {
+        res.status(200).json({ ok: 'true', club });
+      }).catch((err) => {
+        throw new NotFoundError('not_found', `Club ${req.params.id} not found: ${err}`);
+      });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/v0/clubs/:id/executives/new
+router.put('/:id/executives/new', (req, res, next) => {
+  try {
+    const {
+      id: executiveId,
+    } = req.body;
+    if (!checkExist(executiveId)) {
+      throw new BadRequestError('bad_parameter', 'Missing required fields: id');
+    }
+    Club.findById(req.params.id)
+      .then((club) => {
+        club.executives.push(executiveId);
+        club.save()
+          .then((updatedClub) => {
+            res.status(200).json({ ok: 'true', updatedClub });
+          }).catch((err) => {
+            throw new GeneralError('server_error', `Server error: ${err}`);
+          });
+      }).catch((err) => {
+        throw new NotFoundError('not_found', `Club ${req.params.id} not found: ${err}`);
+      });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/v0/clubs/:id/executives/delete
+router.put('/:id/executives/delete', (req, res, next) => {
+  try {
+    const {
+      id: executiveId,
+    } = req.body;
+    if (!checkExist(executiveId)) {
+      throw new BadRequestError('bad_parameter', 'Missing required fields: id');
+    }
+    Club.findById(req.params.id)
+      .then((club) => {
+        club.executives.pull(executiveId);
+        club.save()
+          .then((updatedClub) => {
+            res.status(200).json({ ok: 'true', updatedClub });
+          }).catch((err) => {
+            throw new GeneralError('server_error', `Server error: ${err}`);
+          });
+      }).catch((err) => {
+        throw new NotFoundError('not_found', `Club ${req.params.id} not found: ${err}`);
+      });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/v0/clubs/:id/members/add
+router.put('/:id/members/add', (req, res, next) => {
+  try {
+    const {
+      id: memberId,
+    } = req.body;
+    if (!checkExist(memberId)) {
+      throw new BadRequestError('bad_parameter', 'Missing required fields: id');
+    }
+    Club.findById(req.params.id)
+      .then((club) => {
+        club.members.push(memberId);
+        club.save()
+          .then((updatedClub) => {
+            res.status(200).json({ ok: 'true', updatedClub });
+          }).catch((err) => {
+            throw new GeneralError('server_error', `Server error: ${err}`);
+          });
+      }).catch((err) => {
+        throw new NotFoundError('not_found', `Club ${req.params.id} not found: ${err}`);
+      });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/v0/clubs/:id/members/delete
+router.put('/:id/members/delete', (req, res, next) => {
+  try {
+    const {
+      id: memberId,
+    } = req.body;
+    if (!checkExist(memberId)) {
+      throw new BadRequestError('bad_parameter', 'Missing required fields: id');
+    }
+    Club.findById(req.params.id)
+      .then((club) => {
+        club.members.pull(memberId);
+        club.save()
+          .then((updatedClub) => {
+            res.status(200).json({ ok: 'true', updatedClub });
+          }).catch((err) => {
+            throw new GeneralError('server_error', `Server error: ${err}`);
+          });
+      }).catch((err) => {
+        throw new NotFoundError('not_found', `Club ${req.params.id} not found: ${err}`);
+      });
+  } catch (err) {
+    next(err);
+  }
+});
+
+module.exports = router;
