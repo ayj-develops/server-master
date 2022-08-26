@@ -1,30 +1,26 @@
 /* eslint-disable consistent-return */
 const admin = require('firebase-admin');
-const { GeneralError } = require('./error');
+const { GeneralError, Unauthorized } = require('./error');
 
-const decodeIdToken = async (req, res, next) => {
+const decodeIdToken = async (req, _res, next) => {
   if (req.headers.authorization) {
     if (req.headers.authorization.startsWith('Bearer ')) {
       const idToken = req.headers.authorization.split('Bearer ')[1];
 
       try {
-        if (!idToken) throw new GeneralError('Server Error: Could not process because no authorization header was provided');
+        if (!idToken) throw new Unauthorized('access_token_required', 'Server Error: Could not process because no authorization header was provided');
         const decodedToken = await admin.auth().verifyIdToken(idToken);
         if (decodedToken) {
           req.currentUser = decodedToken;
           return next();
         }
-        return res.status(401).send({ status: 'error', message: 'Unauthorized: Not authenticated' });
+        throw new Unauthorized('access_token_invalid', 'Server Error: Could not process because the provided authorization header was invalid');
       } catch (err) {
-        return res.status(500).send({
-          status: 'error', message: `Server error: ${err}`,
-        });
+        throw new GeneralError('server_error', `Server Error: Could not process because of an internal server error: ${err.message}`);
       }
     }
   } else {
-    return res.status(500).send({
-      status: 'error', message: 'Server Error: Could not process because no authorization header was provided',
-    });
+    throw new GeneralError('server_error', 'Server Error: Could not process because no authorization header was provided');
   }
 };
 
