@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 const Comment = require('../models/comment.model');
 const User = require('../models/user.model');
-const { GeneralError, BadRequest } = require('../middleware/error');
+const { GeneralError, BadRequest, Conflict } = require('../middleware/error');
 const { checkExist } = require('../utils/exist');
 
 // GET /api/v0/comments/
@@ -83,10 +83,16 @@ router.put('/:id/like', (req, res, next) => {
       }).catch((err) => {
         throw new GeneralError('server_error', `Server error: ${err}`);
       });
-    User.findByIdAndUpdate(userId, { $push: { likedComments: req.params.id } })
+    // check if user has comment in likes array
+    User.findById(userId)
       .then((user) => {
         userWorked = true;
         userResponse = user;
+        if (user.liked.includes(req.params.id)) {
+          throw new Conflict('parameter_taken', 'User has already liked this comment');
+        }
+        user.liked.push(req.params.id);
+        user.save();
       }).catch((err) => {
         throw new GeneralError('server_error', `Server error: ${err}`);
       });
@@ -115,15 +121,20 @@ router.put('/:id/unlike', (req, res, next) => {
       }).catch((err) => {
         throw new GeneralError('server_error', `Server error: ${err}`);
       });
-    User.findByIdAndUpdate(userId, { $pull: { liked: req.params.id } })
+    User.findById(userId)
       .then((user) => {
         userWorked = true;
         userResponse = user;
+        if (!user.liked.includes(req.params.id)) {
+          throw new Conflict('parameter_taken', 'User has not liked this comment');
+        }
+        user.liked.splice(user.liked.indexOf(req.params.id), 1);
+        user.save();
       }).catch((err) => {
         throw new GeneralError('server_error', `Server error: ${err}`);
       });
     if (commentWorked && userWorked) {
-      res.json({ ok: 'true', commentResponse, userResponse });
+      res.json({ ok: 'true', comment: commentResponse, user: userResponse });
     } else {
       throw new GeneralError('server_error', 'Something went wrong');
     }
