@@ -178,7 +178,6 @@ router.get('/:id/liked', async (req, res, next) => {
         throw new BadRequest('bad_parameter', 'Missing parameter: type');
       }
       if (type === 'comments') {
-        // get all comments that the user liked from the user's liked array
         const likedComments = await Comment.find({ _id: { $in: user.liked } });
         if (checkExist(likedComments)) {
           commentsResponse = likedComments;
