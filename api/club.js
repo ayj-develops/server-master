@@ -5,6 +5,7 @@ const Club = require('../models/club.model');
 const { BadRequest, NotFound, GeneralError } = require('../middleware/errorHandler');
 const { checkExist } = require('../utils/exist');
 const { slugit } = require('../utils/stringUtils');
+const User = require('../models/user.model');
 
 // GET /api/v0/clubs/
 router.get('/', (req, res, next) => {
@@ -219,6 +220,18 @@ router.put('/:id/members/add', (req, res, next) => {
       }).catch((err) => {
         throw new NotFound('not_found', `Club ${req.params.id} not found: ${err}`);
       });
+    User.findById(memberId)
+      .then((user) => {
+        user.clubs.push(req.params.id);
+        user.save()
+          .then((updatedUser) => {
+            res.status(200).json({ ok: 'true', updatedUser });
+          }).catch((err) => {
+            throw new GeneralError('server_error', `Server error: ${err}`);
+          });
+      }).catch((err) => {
+        throw new NotFound('not_found', `User ${memberId} not found: ${err}`);
+      });
   } catch (err) {
     next(err);
   }
@@ -244,6 +257,70 @@ router.put('/:id/members/delete', (req, res, next) => {
           });
       }).catch((err) => {
         throw new NotFound('not_found', `Club ${req.params.id} not found: ${err}`);
+      });
+    User.findById(memberId)
+      .then((user) => {
+        user.clubs.pull(req.params.id);
+        user.save()
+          .then((updatedUser) => {
+            res.status(200).json({ ok: 'true', updatedUser });
+          }).catch((err) => {
+            throw new GeneralError('server_error', `Server error: ${err}`);
+          });
+      }).catch((err) => {
+        throw new NotFound('not_found', `User ${memberId} not found: ${err}`);
+      });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/v0/clubs/:id/favourite
+router.put('/:id/favourite', (req, res, next) => {
+  try {
+    const {
+      id: userId,
+    } = req.body;
+    if (!checkExist(userId)) {
+      throw new BadRequest('bad_parameter', 'Missing required fields: id');
+    }
+    User.findById(userId)
+      .then((user) => {
+        user.favourite_clubs.push(req.params.id);
+        user.save()
+          .then((updatedUser) => {
+            res.status(200).json({ ok: 'true', updatedUser });
+          }).catch((err) => {
+            throw new GeneralError('server_error', `Server error: ${err}`);
+          });
+      }).catch((err) => {
+        throw new NotFound('not_found', `User ${userId} not found: ${err}`);
+      });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/v0/clubs/:id/unfavourite
+router.put('/:id/unfavourite', (req, res, next) => {
+  try {
+    const {
+      id: userId,
+    } = req.body;
+    if (!checkExist(userId)) {
+      throw new BadRequest('bad_parameter', 'Missing required fields: id');
+    }
+    User.findById(userId)
+      .then((user) => {
+        user.favourite_clubs.pull(req.params.id);
+        user.save()
+          .then((updatedUser) => {
+            res.status(200).json({ ok: 'true', updatedUser });
+          }).catch((err) => {
+            throw new GeneralError('server_error', `Server error: ${err}`);
+          });
+      }).catch((err) => {
+        throw new NotFound('not_found', `User ${userId} not found: ${err}`);
       });
   } catch (err) {
     next(err);
