@@ -2,12 +2,12 @@ const express = require('express');
 
 const router = express.Router();
 const Club = require('../models/club.model');
-const { BadRequestError, NotFoundError, GeneralError } = require('../middleware/errorHandler');
+const { BadRequest, NotFound, GeneralError } = require('../middleware/errorHandler');
 const { checkExist } = require('../utils/exist');
 const { slugit } = require('../utils/stringUtils');
 
 // GET /api/v0/clubs/
-router.get('/', (_req, res, next) => {
+router.get('/', (req, res, next) => {
   Club.find()
     .then((clubs) => {
       res.status(200).json({ ok: 'true', clubs });
@@ -30,7 +30,7 @@ router.post('/create', (req, res, next) => {
   } = req.body;
 
   if (!checkExist(clubName) || !checkExist(clubDescription) || !checkExist(clubTeacher)) {
-    throw new BadRequestError('bad_parameter', 'Missing required fields');
+    throw new BadRequest('bad_parameter', 'Missing required fields');
   }
 
   const socialsObject = {};
@@ -54,7 +54,7 @@ router.post('/create', (req, res, next) => {
   }
 
   if (clubDescription.length < 50 || clubDescription.length > 500) {
-    throw new BadRequestError('exceeded_char', 'Description must be between 50 and 500 characters');
+    throw new BadRequest('exceeded_char', 'Description must be between 50 and 500 characters');
   } else {
     Club.create(clubObject)
       .then((club) => {
@@ -76,7 +76,7 @@ router.get('/:id', (req, res, next) => {
         res.status(200).json(club);
       })
       .catch((err) => {
-        throw new NotFoundError('not_found', `Club ${req.params.id} not found: ${err}`);
+        throw new NotFound('not_found', `Club ${req.params.id} not found: ${err}`);
       });
   } catch (err) {
     next(err);
@@ -97,7 +97,7 @@ router.put('/:id/update', (req, res, next) => {
     } = req.body;
 
     if (!checkExist(clubName) || !checkExist(clubDescription) || !checkExist(clubTeacher)) {
-      throw new BadRequestError('bad_parameter', 'Missing required fields');
+      throw new BadRequest('bad_parameter', 'Missing required fields');
     }
     const socialsObject = {};
     const clubObject = {
@@ -118,7 +118,7 @@ router.put('/:id/update', (req, res, next) => {
       };
     }
     if (clubDescription.length < 50 || clubDescription.length > 500) {
-      throw new BadRequestError('exceeded_char', 'Description must be between 50 and 500 characters');
+      throw new BadRequest('exceeded_char', 'Description must be between 50 and 500 characters');
     } else {
       Club.findByIdAndUpdate(req.params.id, clubObject, { new: true })
         .then((club) => {
@@ -139,7 +139,7 @@ router.delete('/:id/delete', (req, res, next) => {
       .then((club) => {
         res.status(200).json({ ok: 'true', club });
       }).catch((err) => {
-        throw new NotFoundError('not_found', `Club ${req.params.id} not found: ${err}`);
+        throw new NotFound('not_found', `Club ${req.params.id} not found: ${err}`);
       });
   } catch (err) {
     next(err);
@@ -153,7 +153,7 @@ router.put('/:id/executives/new', (req, res, next) => {
       id: executiveId,
     } = req.body;
     if (!checkExist(executiveId)) {
-      throw new BadRequestError('bad_parameter', 'Missing required fields: id');
+      throw new BadRequest('bad_parameter', 'Missing required fields: id');
     }
     Club.findById(req.params.id)
       .then((club) => {
@@ -165,7 +165,7 @@ router.put('/:id/executives/new', (req, res, next) => {
             throw new GeneralError('server_error', `Server error: ${err}`);
           });
       }).catch((err) => {
-        throw new NotFoundError('not_found', `Club ${req.params.id} not found: ${err}`);
+        throw new NotFound('not_found', `Club ${req.params.id} not found: ${err}`);
       });
   } catch (err) {
     next(err);
@@ -179,7 +179,7 @@ router.put('/:id/executives/delete', (req, res, next) => {
       id: executiveId,
     } = req.body;
     if (!checkExist(executiveId)) {
-      throw new BadRequestError('bad_parameter', 'Missing required fields: id');
+      throw new BadRequest('bad_parameter', 'Missing required fields: id');
     }
     Club.findById(req.params.id)
       .then((club) => {
@@ -191,7 +191,7 @@ router.put('/:id/executives/delete', (req, res, next) => {
             throw new GeneralError('server_error', `Server error: ${err}`);
           });
       }).catch((err) => {
-        throw new NotFoundError('not_found', `Club ${req.params.id} not found: ${err}`);
+        throw new NotFound('not_found', `Club ${req.params.id} not found: ${err}`);
       });
   } catch (err) {
     next(err);
@@ -205,7 +205,7 @@ router.put('/:id/members/add', (req, res, next) => {
       id: memberId,
     } = req.body;
     if (!checkExist(memberId)) {
-      throw new BadRequestError('bad_parameter', 'Missing required fields: id');
+      throw new BadRequest('bad_parameter', 'Missing required fields: id');
     }
     Club.findById(req.params.id)
       .then((club) => {
@@ -217,7 +217,7 @@ router.put('/:id/members/add', (req, res, next) => {
             throw new GeneralError('server_error', `Server error: ${err}`);
           });
       }).catch((err) => {
-        throw new NotFoundError('not_found', `Club ${req.params.id} not found: ${err}`);
+        throw new NotFound('not_found', `Club ${req.params.id} not found: ${err}`);
       });
   } catch (err) {
     next(err);
@@ -231,7 +231,7 @@ router.put('/:id/members/delete', (req, res, next) => {
       id: memberId,
     } = req.body;
     if (!checkExist(memberId)) {
-      throw new BadRequestError('bad_parameter', 'Missing required fields: id');
+      throw new BadRequest('bad_parameter', 'Missing required fields: id');
     }
     Club.findById(req.params.id)
       .then((club) => {
@@ -243,7 +243,7 @@ router.put('/:id/members/delete', (req, res, next) => {
             throw new GeneralError('server_error', `Server error: ${err}`);
           });
       }).catch((err) => {
-        throw new NotFoundError('not_found', `Club ${req.params.id} not found: ${err}`);
+        throw new NotFound('not_found', `Club ${req.params.id} not found: ${err}`);
       });
   } catch (err) {
     next(err);

@@ -2,7 +2,7 @@
 const admin = require('firebase-admin');
 const { GeneralError, Unauthorized } = require('./error');
 
-const decodeIdToken = async (req, _res, next) => {
+const decodeIdToken = async (req, res, next) => {
   if (req.headers.authorization) {
     if (req.headers.authorization.startsWith('Bearer ')) {
       const idToken = req.headers.authorization.split('Bearer ')[1];

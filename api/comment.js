@@ -1,116 +1,133 @@
+/* eslint-disable no-unused-vars */
 const express = require('express');
-const bodyParser = require('body-parser');
-const { checkExist } = require('../utils/exist');
-const { BadRequest, GeneralError } = require('../middleware/error');
-const Comment = require('../models/comment.model');
 
 const router = express.Router();
-const jsonParser = bodyParser.json();
+const Comment = require('../models/comment.model');
+const User = require('../models/user.model');
+const { GeneralError, BadRequest } = require('../middleware/error');
+const { checkExist } = require('../utils/exist');
 
-/** create a new comment */
-router.post('/create', jsonParser, async (req, res, next) => {
-  const {
-    author: userId,
-    post: postId,
-    body: commentBody,
-    parent: parentCommentId,
-  } = req.body;
-
+// GET /api/v0/comments/
+router.get('/', (req, res, next) => {
   try {
-    if (!checkExist(userId)) throw new BadRequest('Missing required field: author');
-    if (!checkExist(commentBody)) throw new BadRequest('Missing required field: body');
-
-    let _parentCommentId = null;
-    if (checkExist(parentCommentId)) _parentCommentId = parentCommentId;
-    const newComment = new Comment({
-      author: userId,
-      postParent: postId,
-      body: commentBody,
-      parent: _parentCommentId,
-    });
-
-    newComment.save().then(() => {
-      res.status(201).send(newComment);
-    }).catch((err) => {
-      if (err) throw new GeneralError('Server Error', `Error: ${err}`);
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-/** deletes a comment (only obscures public facing comment) */
-router.delete('/delete', jsonParser, async (req, res, next) => {
-  const {
-    user_id: userId,
-    comment: commentId,
-  } = req.body;
-
-  // TODO: Secure with role based permissions (only ADMIN can delete, excludes club execs)
-
-  try {
-    const currCommentBody = Comment.findOne({ _id: commentId }).body;
-
-    Comment.findOneAndUpdate(
-      { _id: commentId },
-      { body: 'This comment has been deleted', deletedMessage: currCommentBody },
-      { new: true },
-      (err, comment) => {
-        if (err) throw new GeneralError('Server Error', `${err}`);
-        else {
-          res.status(200).send(comment);
-        }
-      },
-    );
-  } catch (err) {
-    next(err);
-  }
-});
-
-/** retrieve comments from post */
-router.get('/', jsonParser, async (req, res, next) => {
-  const { post: postId } = req.body;
-
-  const postComments = [];
-
-  try {
-    if (!checkExist(postId)) throw new BadRequest('Missing required field: post');
-    Comment.find({ post_parent: postId }, (err, comments) => {
-      if (err) throw new GeneralError('Server Error', `${err}`);
-      comments.forEach((comment) => {
-        postComments.push(comment);
+    Comment.find()
+      .then((comments) => {
+        res.json({ ok: 'true', comments });
+      })
+      .catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
       });
-      res.status(200).send(postComments);
-    });
   } catch (err) {
-    next(err);
+    throw new GeneralError('server_error', `Server error: ${err.message}`);
   }
 });
 
-/** update a comment */
-router.put('/update', jsonParser, async (req, res, next) => {
-  const {
-    user_id: userId,
-    author: authorId,
-    comment: commentId,
-    body: newCommentBody,
-  } = req.body;
-
+// GET /api/v0/comments/:id
+router.get('/:id', (req, res, next) => {
   try {
-    if (!checkExist(commentId)) throw new BadRequest('Missing required field: comment');
-    if (!checkExist(newCommentBody)) throw new BadRequest('Missing required field: body');
-    Comment.findOneAndUpdate(
-      { _id: commentId },
-      { body: newCommentBody },
-      { new: true },
-      (err, comment) => {
-        if (err) throw new GeneralError('Server Error', `${err}`);
-        res.status(200).send(comment);
-      },
-    );
+    Comment.findById(req.params.id)
+      .then((comment) => {
+        res.json({ ok: 'true', comment });
+      })
+      .catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
   } catch (err) {
-    next(err);
+    throw new GeneralError('server_error', `Server error: ${err.message}`);
   }
 });
 
-module.exports = router;
+// DELETE /api/v0/comments/:id/delete
+router.delete('/:id/delete', (req, res, next) => {
+  try {
+    Comment.findByIdAndDelete(req.params.id)
+      .then((comment) => {
+        res.json({ ok: 'true', comment });
+      }).catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
+  } catch (err) {
+    throw new GeneralError('server_error', `Server error: ${err.message}`);
+  }
+});
+
+// PUT /api/v0/comments/:id/update
+router.put('/:id/update', (req, res, next) => {
+  try {
+    if (!checkExist(req.body.body)) {
+      throw new BadRequest('bad_parameter', 'Body field is empty');
+    }
+    Comment.findByIdAndUpdate(req.params.id, { body: req.body.body })
+      .then((comment) => {
+        res.json({ ok: 'true', comment });
+      }).catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
+  } catch (err) {
+    throw new GeneralError('server_error', `Server error: ${err.message}`);
+  }
+});
+
+// PUT /api/v0/comments/:id/like
+router.put('/:id/like', (req, res, next) => {
+  const { id: userId } = req.body;
+  try {
+    let commentWorked = false;
+    let userWorked = false;
+    let commentResponse;
+    let userResponse;
+    Comment.findByIdAndUpdate(req.params.id, { $inc: { likes: 1 } })
+      .then((comment) => {
+        commentWorked = true;
+        commentResponse = comment;
+      }).catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
+    User.findByIdAndUpdate(userId, { $push: { likedComments: req.params.id } })
+      .then((user) => {
+        userWorked = true;
+        userResponse = user;
+      }).catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
+    if (commentWorked && userWorked) {
+      res.json({ ok: 'true', comment: commentResponse, user: userResponse });
+    } else {
+      throw new GeneralError('server_error', 'Something went wrong');
+    }
+  } catch (err) {
+    throw new GeneralError('server_error', `Server error: ${err.message}`);
+  }
+});
+
+// PUT /api/v0/comments/:id/unlike
+router.put('/:id/unlike', (req, res, next) => {
+  const { id: userId } = req.body;
+  try {
+    let commentWorked = false;
+    let userWorked = false;
+    let commentResponse;
+    let userResponse;
+    Comment.findByIdAndUpdate(req.params.id, { $inc: { likes: -1 } })
+      .then((comment) => {
+        commentWorked = true;
+        commentResponse = comment;
+      }).catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
+    User.findByIdAndUpdate(userId, { $pull: { liked: req.params.id } })
+      .then((user) => {
+        userWorked = true;
+        userResponse = user;
+      }).catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
+    if (commentWorked && userWorked) {
+      res.json({ ok: 'true', commentResponse, userResponse });
+    } else {
+      throw new GeneralError('server_error', 'Something went wrong');
+    }
+  } catch (err) {
+    throw new GeneralError('server_error', `Server error: ${err.message}`);
+  }
+});

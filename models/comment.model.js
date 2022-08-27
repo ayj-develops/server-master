@@ -33,6 +33,9 @@ const CommentSchema = new Schema({
     type: String,
     required: false,
   },
+  likes: {
+    type: Number,
+  },
 });
 
 const Comment = mongoose.model('Comment', CommentSchema);

@@ -1,9 +1,5 @@
 const mongoose = require('mongoose');
 
-const { ObjectId } = require('mongodb');
-const User = require('./user.model');
-const Club = require('./club.model');
-
 const { Schema } = mongoose;
 
 // TODO: Temporarily use barebones schema to recieve json
@@ -42,7 +38,7 @@ const PostSchema = new Schema({
     required: true,
     default: 0,
   },
-  flairs: String,
+  flairs: [String],
   attachment: {
     type: Object,
     required: false,
@@ -58,6 +54,12 @@ const PostSchema = new Schema({
     type: mongoose.Types.ObjectId,
     required: false,
     unique: false,
+  }],
+  comments: [{
+    type: mongoose.Types.ObjectId,
+    required: false,
+    unique: false,
+    ref: 'Comment',
   }],
 });
 
