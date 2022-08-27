@@ -18,6 +18,9 @@ const ClubSchema = new Schema({
   //     required: true
   // },
   slug: String,
+  bannerImage: {
+    type: String,
+  },
   // description: {
   //     type: String,
   //     unique: false,

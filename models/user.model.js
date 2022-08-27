@@ -9,11 +9,6 @@ const UserSchema = new Schema({
     trim: true,
     unique: true,
   },
-  pfp: {
-    type: Object,
-    unique: false,
-    required: false,
-  },
   clubs: [{
     type: mongoose.Types.ObjectId,
     unique: false,

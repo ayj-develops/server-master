@@ -1,10 +1,13 @@
+/* eslint-disable no-param-reassign */
 /* eslint-disable no-unused-vars */
 const express = require('express');
 
 const router = express.Router();
 const Comment = require('../models/comment.model');
 const User = require('../models/user.model');
-const { GeneralError, BadRequest, Conflict } = require('../middleware/error');
+const {
+  GeneralError, BadRequest, Conflict, NotFound,
+} = require('../middleware/error');
 const { checkExist } = require('../utils/exist');
 
 // GET /api/v0/comments/
@@ -40,9 +43,19 @@ router.get('/:id', (req, res, next) => {
 // DELETE /api/v0/comments/:id/delete
 router.delete('/:id/delete', (req, res, next) => {
   try {
-    Comment.findByIdAndDelete(req.params.id)
+    Comment.findById(req.params.id)
       .then((comment) => {
-        res.json({ ok: 'true', comment });
+        if (!checkExist(comment)) {
+          throw new NotFound('not_found', `Comment not found: ${req.params.id}`);
+        }
+        comment.body = 'This comment has been deleted';
+        comment.deletedMessage = comment.body;
+        comment.save()
+          .then((updatedComment) => {
+            res.json({ ok: 'true', updatedComment });
+          }).catch((err) => {
+            throw new GeneralError('server_error', `Server error: ${err}`);
+          });
       }).catch((err) => {
         throw new GeneralError('server_error', `Server error: ${err}`);
       });
