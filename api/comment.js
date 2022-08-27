@@ -142,3 +142,5 @@ router.put('/:id/unlike', (req, res, next) => {
     throw new GeneralError('server_error', `Server error: ${err.message}`);
   }
 });
+
+module.exports = router;
