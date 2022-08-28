@@ -42,7 +42,7 @@ app.get('/', (req, res) => {
 // setup firebase middlware
 const decodeIdToken = require('./middleware/firebaseAuthHandler');
 
-// app.use(decodeIdToken);
+app.use(decodeIdToken);
 
 // error handler middleware
 const handleErrors = require('./middleware/errorHandler');
