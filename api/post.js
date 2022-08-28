@@ -2,10 +2,10 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const hash = require('object-hash');
 const mongoose = require('mongoose');
-const { checkExist } = require('./exist');
+const { checkExist } = require('../utils/exist');
 const Post = require('../models/post.model');
 const User = require('../models/user.model');
-const { getUser, getPost, getClub } = require('./miscallenous');
+const { getUser, getPost, getClub } = require('../utils/queries');
 const {
   BadRequest, NotFound, Forbidden, GeneralError, Conflict,
 } = require('../middleware/error');
