@@ -12,5 +12,12 @@
     },
     "rules": {
         "no-underscore-dangle": "off"
-    }
+    },
+    "overrides": [
+        {
+            "files": [
+                "__tests__/**/*.test.js"
+            ]
+        }
+    ],
 }
