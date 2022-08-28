@@ -44,6 +44,11 @@ const decodeIdToken = require('./middleware/firebaseAuthHandler');
 
 app.use(decodeIdToken);
 
+// error handler middleware
+const handleErrors = require('./middleware/errorHandler');
+
+app.use(handleErrors);
+
 /* define api routes */
 const userRouter = require('./api/user');
 
@@ -61,9 +66,7 @@ const postRouter = require('./api/post');
 
 app.use(`${API_ROUTE}/post`, postRouter);
 
-const handleErrors = require('./middleware/errorHandler');
-
-app.use(handleErrors);
+app.use(`${API_ROUTE}/admin`, require('./api/admin'));
 
 // listening to the port
 const PORT = 8000;
