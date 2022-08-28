@@ -4,7 +4,7 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "nodemon app.js",
+    "start": "nodemon server.js",
     "lint": "eslint --fix --ext .js,.jsx .",
     "test": "jest",
     "test:watch": "jest --watch"
