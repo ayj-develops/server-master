@@ -42,7 +42,7 @@ app.get('/', (req, res) => {
 // setup firebase middlware
 const decodeIdToken = require('./middleware/firebaseAuthHandler');
 
-app.use(decodeIdToken);
+// app.use(decodeIdToken);
 
 /* define api routes */
 const userRouter = require('./api/user');
@@ -65,7 +65,4 @@ const handleErrors = require('./middleware/errorHandler');
 
 app.use(handleErrors);
 
-// listening to the port
-const PORT = 8000;
-// eslint-disable-next-line no-console
-app.listen(PORT, () => console.log(`listening on port ${PORT}`)); // dev
+module.exports = app;
