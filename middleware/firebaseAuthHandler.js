@@ -14,7 +14,7 @@ const decodeIdToken = async (req, res, next) => {
         const hash = crypto.createHash('sha512');
 
         if (decodedToken) {
-          const isStudent = crypto.timingSafeEqual(hash.copy().update(decodedToken).digest(), hash.copy().update('tdsb.on.ca').digest());
+          const isStudent = crypto.timingSafeEqual(hash.copy().update(decodedToken.email).digest(), hash.copy().update('tdsb.on.ca').digest());
           req.currentUser = decodedToken;
           req.currentUser.status = isStudent ? 'student' : 'teacher';
           return next();
