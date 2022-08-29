@@ -2,7 +2,8 @@
     "env": {
         "commonjs": true,
         "es2021": true,
-        "node": true
+        "node": true,
+        "jest/globals": true
     },
     "extends": [
         "airbnb-base"
@@ -16,8 +17,11 @@
     "overrides": [
         {
             "files": [
-                "__tests__/**/*.test.js"
+                "__tests__/*.test.js"
             ]
         }
+    ],
+    "plugins": [
+        "jest"
     ]
 }
