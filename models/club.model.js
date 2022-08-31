@@ -69,7 +69,6 @@ const ClubSchema = new Schema({
   //     ref: 'User'
   // }],
   teacher: mongoose.Types.ObjectId,
-  flairs: [String],
 });
 
 const Club = mongoose.model('Club', ClubSchema);

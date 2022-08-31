@@ -1,6 +1,6 @@
-const { default: slugify } = require('slugify');
+const slugify = require('slugify');
 
-const slugit = ({ name }) => {
+const slugit = (name) => {
   slugify(name, { lower: true });
 };
 

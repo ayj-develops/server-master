@@ -15,7 +15,8 @@ const connectMongo = require('./config/mongo.config');
 app.use(cors(corsOptions));
 app.use(helmet());
 app.use(compression());
-app.use(bodyParser());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.disable('x-powered-by');
 
 require('dotenv').config();
@@ -32,7 +33,8 @@ admin.initializeApp({
 });
 
 // Connect to mongodb
-connectMongo();
+// connectMongo(); // comment out when testing, tests run using an in memory mongodb database
+
 
 // index
 app.get('/', (req, res) => {

@@ -6,8 +6,13 @@
   "scripts": {
     "start": "nodemon server.js",
     "lint": "eslint --fix --ext .js,.jsx .",
-    "test": "jest",
-    "test:watch": "jest --watch"
+    "test": "jest --detectOpenHandles --forceExit",
+    "test:watch": "jest --watch --detectOpenHandles --forceExit"
+  },
+  "jest": {
+    "testPathIgnorePatterns": [
+      "__tests__/utils/"
+    ]
   },
   "repository": {
     "type": "git",

@@ -2,10 +2,11 @@ const express = require('express');
 
 const router = express.Router();
 const Club = require('../models/club.model');
-const { BadRequest, NotFound, GeneralError } = require('../middleware/errorHandler');
+const { BadRequest, NotFound, GeneralError } = require('../middleware/error');
 const { checkExist } = require('../utils/exist');
 const { slugit } = require('../utils/stringUtils');
 const User = require('../models/user.model');
+const mongoose = require('mongoose');
 
 // GET /api/v0/clubs/
 router.get('/', (req, res, next) => {
@@ -36,9 +37,11 @@ router.post('/create', (req, res, next) => {
 
   const socialsObject = {};
 
+  const clubSlug = slugit(clubName.toString());
+
   const clubObject = {
     name: clubName,
-    slug: slugit(clubName),
+    slug: clubSlug,
     description: clubDescription,
     socials: socialsObject,
     clubfest_link: clubClubfestLink,
@@ -54,8 +57,8 @@ router.post('/create', (req, res, next) => {
     };
   }
 
-  if (clubDescription.length < 50 || clubDescription.length > 500) {
-    throw new BadRequest('exceeded_char', 'Description must be between 50 and 500 characters');
+  if (clubDescription.length < 10 || clubDescription.length > 500) {
+    throw new BadRequest('exceeded_char', 'Description must be between 10 and 500 characters');
   } else {
     Club.create(clubObject)
       .then((club) => {
@@ -101,9 +104,10 @@ router.put('/:id/update', (req, res, next) => {
       throw new BadRequest('bad_parameter', 'Missing required fields');
     }
     const socialsObject = {};
+    const clubSlug = slugit(clubName);
     const clubObject = {
       name: clubName,
-      slug: slugit(clubName),
+      slug: clubSlug,
       description: clubDescription,
       socials: socialsObject,
       clubfest_link: clubClubfestLink,
@@ -153,12 +157,13 @@ router.put('/:id/executives/new', (req, res, next) => {
     const {
       id: executiveId,
     } = req.body;
+    console.log(executiveId);
     if (!checkExist(executiveId)) {
       throw new BadRequest('bad_parameter', 'Missing required fields: id');
     }
     Club.findById(req.params.id)
       .then((club) => {
-        club.executives.push(executiveId);
+        club.execs.push(executiveId);
         club.save()
           .then((updatedClub) => {
             res.status(200).json({ ok: 'true', updatedClub });
