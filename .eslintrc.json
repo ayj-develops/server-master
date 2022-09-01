@@ -2,7 +2,8 @@
     "env": {
         "commonjs": true,
         "es2021": true,
-        "node": true
+        "node": true,
+        "jest/globals": true
     },
     "extends": [
         "airbnb-base"
@@ -12,5 +13,15 @@
     },
     "rules": {
         "no-underscore-dangle": "off"
-    }
+    },
+    "overrides": [
+        {
+            "files": [
+                "__tests__/*.test.js"
+            ]
+        }
+    ],
+    "plugins": [
+        "jest"
+    ]
 }

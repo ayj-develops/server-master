@@ -1,14 +1,11 @@
 /* eslint-disable no-use-before-define */
 /* eslint-disable max-classes-per-file */
 
-/**
- * Superclass invokes subclass instances to return status codes
- */
 class GeneralError extends Error {
-  constructor(message, stacktrace) {
+  constructor(errorName, description) {
     super();
-    this.message = message;
-    this.stacktrace = stacktrace || 'No error stacktrace provided';
+    this.error_name = errorName;
+    this.description = description;
   }
 
   getCode() {
@@ -21,12 +18,12 @@ class GeneralError extends Error {
     return 500;
   }
 
-  getMessage() {
-    return this.message;
+  getErrorName() {
+    return this.error_name;
   }
 
-  getStackTrace() {
-    return this.stacktrace;
+  getDescription() {
+    return this.description;
   }
 }
 

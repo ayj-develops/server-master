@@ -15,7 +15,8 @@ const connectMongo = require('./config/mongo.config');
 app.use(cors(corsOptions));
 app.use(helmet());
 app.use(compression());
-app.use(bodyParser());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.disable('x-powered-by');
 
 require('dotenv').config();
@@ -32,7 +33,7 @@ admin.initializeApp({
 });
 
 // Connect to mongodb
-connectMongo();
+connectMongo(); // comment out when testing, tests run using an in memory mongodb database
 
 // index
 app.get('/', (req, res) => {
@@ -43,6 +44,11 @@ app.get('/', (req, res) => {
 const decodeIdToken = require('./middleware/firebaseAuthHandler');
 
 app.use(decodeIdToken);
+
+// error handler middleware
+const handleErrors = require('./middleware/errorHandler');
+
+app.use(handleErrors);
 
 /* define api routes */
 const userRouter = require('./api/user');
@@ -61,11 +67,6 @@ const postRouter = require('./api/post');
 
 app.use(`${API_ROUTE}/post`, postRouter);
 
-const handleErrors = require('./middleware/errorHandler');
+app.use(`${API_ROUTE}/admin`, require('./api/admin'));
 
-app.use(handleErrors);
-
-// listening to the port
-const PORT = 8000;
-// eslint-disable-next-line no-console
-app.listen(PORT, () => console.log(`listening on port ${PORT}`)); // dev
+module.exports = app;

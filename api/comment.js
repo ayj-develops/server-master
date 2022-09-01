@@ -1,70 +1,158 @@
+/* eslint-disable no-param-reassign */
+/* eslint-disable no-unused-vars */
 const express = require('express');
-const bodyParser = require('body-parser');
-const hash = require('object-hash');
-const { checkExist } = require('./exist');
 
 const router = express.Router();
-const jsonParser = bodyParser.json();
+const Comment = require('../models/comment.model');
+const User = require('../models/user.model');
+const {
+  GeneralError, BadRequest, Conflict, NotFound,
+} = require('../middleware/error');
+const { checkExist } = require('../utils/exist');
 
-router.post('/create', jsonParser, async (req, res) => {
-  let { name, body, parent } = req.body;
-  // do not await when querying mongoose
-  if (!checkExist(name) || !checkExist(body) || !checkExist(parent)) {
-    res.status(400).send({ Message: 'Missing params' });
-  } else if (req.body.body.length > 500) {
-    res.status(400).json({ Message: 'Word limit exceeded' });
-  } else {
-    name = hash(name, { algorithm: 'sha1' });
-    const newComment = new Comment({ name, body, parent });
-    newComment.save().then(() => {
-      res.status(201).json({ Message: 'Success' });
-    })
-      .catch((err) => res.status(500).json({ Message: 'Server Error', Error: `${err}` }));
-  }
-});
-
-router.delete('/delete', jsonParser, async (req, res) => {
-  let { _id, name } = req.body;
-  name = hash(name, { algorithm: 'sha1' });
-  User.findById({ _id }, (err, comment) => {
-    if (err) {
-      res.status(500).send({ Message: 'Error' });
-    } else if (!checkExist(comment)) {
-      res.status(400).send({ Message: 'Comment not found' });
-    } else if (comment.name !== name) {
-      res.status(400).send({ Message: 'This is not your comment' });
-    } else {
-      User.findByIdAndDelete({ _id }, (err, comment) => {
-        if (err) res.status(500).json({ Message: 'Error' });
-        else {
-          res.status(200).send({ Message: 'Success' });
-        }
+// GET /api/v0/comments/
+router.get('/', (req, res, next) => {
+  try {
+    Comment.find()
+      .then((comments) => {
+        res.json({ ok: 'true', comments });
+      })
+      .catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
       });
-    }
-  });
-});
-
-router.get('/', jsonParser, async (req, res) => {
-  if (!checkExist(req.query._id)) {
-    res.status(200).send(await Comment.find());
-  } else {
-    const { _id } = req.body;
-    Comment.findById({ _id }, async (err, comment) => {
-      if (err) {
-        res.status(500).send({ Message: 'Error' });
-      } else if (comment === null) {
-        res.status(400).send({ Message: 'Comment not found' });
-      } else {
-        res.status(200).send(comment);
-      }
-    });
+  } catch (err) {
+    throw new GeneralError('server_error', `Server error: ${err.message}`);
   }
 });
 
-router.put('/update', jsonParser, async (req, res) => {
-  const { _id, body } = req.body;
-  if (!checkExist(_id)) {
-    res.status(400).send({ Message: '_id param is missing' });
+// GET /api/v0/comments/:id
+router.get('/:id', (req, res, next) => {
+  try {
+    Comment.findById(req.params.id)
+      .then((comment) => {
+        res.json({ ok: 'true', comment });
+      })
+      .catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
+  } catch (err) {
+    throw new GeneralError('server_error', `Server error: ${err.message}`);
+  }
+});
+
+// DELETE /api/v0/comments/:id/delete
+router.delete('/:id/delete', (req, res, next) => {
+  try {
+    Comment.findById(req.params.id)
+      .then((comment) => {
+        if (!checkExist(comment)) {
+          throw new NotFound('not_found', `Comment not found: ${req.params.id}`);
+        }
+        comment.body = 'This comment has been deleted';
+        comment.deletedMessage = comment.body;
+        comment.save()
+          .then((updatedComment) => {
+            res.json({ ok: 'true', updatedComment });
+          }).catch((err) => {
+            throw new GeneralError('server_error', `Server error: ${err}`);
+          });
+      }).catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
+  } catch (err) {
+    throw new GeneralError('server_error', `Server error: ${err.message}`);
+  }
+});
+
+// PUT /api/v0/comments/:id/update
+router.put('/:id/update', (req, res, next) => {
+  try {
+    if (!checkExist(req.body.body)) {
+      throw new BadRequest('bad_parameter', 'Body field is empty');
+    }
+    Comment.findByIdAndUpdate(req.params.id, { body: req.body.body })
+      .then((comment) => {
+        res.json({ ok: 'true', comment });
+      }).catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
+  } catch (err) {
+    throw new GeneralError('server_error', `Server error: ${err.message}`);
+  }
+});
+
+// PUT /api/v0/comments/:id/like
+router.put('/:id/like', (req, res, next) => {
+  const { id: userId } = req.body;
+  try {
+    let commentWorked = false;
+    let userWorked = false;
+    let commentResponse;
+    let userResponse;
+    Comment.findByIdAndUpdate(req.params.id, { $inc: { likes: 1 } })
+      .then((comment) => {
+        commentWorked = true;
+        commentResponse = comment;
+      }).catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
+    // check if user has comment in likes array
+    User.findById(userId)
+      .then((user) => {
+        userWorked = true;
+        userResponse = user;
+        if (user.liked.includes(req.params.id)) {
+          throw new Conflict('parameter_taken', 'User has already liked this comment');
+        }
+        user.liked.push(req.params.id);
+        user.save();
+      }).catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
+    if (commentWorked && userWorked) {
+      res.json({ ok: 'true', comment: commentResponse, user: userResponse });
+    } else {
+      throw new GeneralError('server_error', 'Something went wrong');
+    }
+  } catch (err) {
+    throw new GeneralError('server_error', `Server error: ${err.message}`);
+  }
+});
+
+// PUT /api/v0/comments/:id/unlike
+router.put('/:id/unlike', (req, res, next) => {
+  const { id: userId } = req.body;
+  try {
+    let commentWorked = false;
+    let userWorked = false;
+    let commentResponse;
+    let userResponse;
+    Comment.findByIdAndUpdate(req.params.id, { $inc: { likes: -1 } })
+      .then((comment) => {
+        commentWorked = true;
+        commentResponse = comment;
+      }).catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
+    User.findById(userId)
+      .then((user) => {
+        userWorked = true;
+        userResponse = user;
+        if (!user.liked.includes(req.params.id)) {
+          throw new Conflict('parameter_taken', 'User has not liked this comment');
+        }
+        user.liked.splice(user.liked.indexOf(req.params.id), 1);
+        user.save();
+      }).catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
+    if (commentWorked && userWorked) {
+      res.json({ ok: 'true', comment: commentResponse, user: userResponse });
+    } else {
+      throw new GeneralError('server_error', 'Something went wrong');
+    }
+  } catch (err) {
+    throw new GeneralError('server_error', `Server error: ${err.message}`);
   }
 });
 
