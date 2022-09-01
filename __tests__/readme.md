@@ -61,3 +61,47 @@ it('GET /clubs/:id should get the club', async () => {
 ```
 
 Additionally, each test should focus on **one** endpoint.
+
+## Full sample
+
+```js
+describe('What object this test suite interacts with', () => {
+    beforeAll(async () => {
+        const tempMongoDB = await MongoMemoryServer.create();
+        await mongoose.connect(`${tempMongoDB.getUri()}`, {
+            useNewUrlParser: true,
+            useUnifiedTopology: true
+        });
+        await setUpUsers();
+        console.log('setUpUsers() completed');
+    });
+
+    it('GET /clubs/:id should get the club', async () => {
+
+        const teacher = await User.findOne({
+            email: 'teacherOne@tdsb.on.ca'
+        });
+        const newClub = {
+            name: 'Club One',
+            description: 'This is a new club called Club One',
+            teacher: teacher._id,
+            instagram: 'https://www.instagram.com/github',
+            google_classroom_code: 'https://classroom.google.com/c/123456789',
+            signup_link: 'https://forms.gle/ZYXWVUTSRQPQWERTY',
+        };
+
+        const response = await request
+            .post('/api/v0/clubs/create')
+            .set('Authorization', `Bearer ${authToken}`)
+            .send(newClub);
+
+        expect(response.status).toBe(200);
+        expect(response.club.name).toBe('Club One');
+
+    }, 20000);
+
+    afterAll(async () => {
+        await mongoose.disconnect();
+    });
+});
+```
