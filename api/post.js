@@ -1,15 +1,10 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const hash = require('object-hash');
-const mongoose = require('mongoose');
-const { checkExist } = require('./exist');
 const Post = require('../models/post.model');
-const User = require('../models/user.model');
-const Club = require('../models/club.model');
-const Comment = require('../models/comment.model');
+const { checkExist } = require('../utils/exist');
 const { getUser, getPost, getClub } = require('../utils/queries');
 const {
-  BadRequest, NotFound, Forbidden, GeneralError, Conflict,
+  BadRequest, NotFound, Forbidden, GeneralError,
 } = require('../middleware/error');
 
 const router = express.Router();
@@ -73,14 +68,12 @@ router.post('/create', jsonParser, async (req, res, next) => {
   const newPostFields = {};
 
   try {
-    if (checkExist(req.body.title)) { newPostFields.title = req.body.title; } 
-    else { throw new BadRequest('bad_request', 'Title is required'); }
+    if (checkExist(req.body.title)) { newPostFields.title = req.body.title; } else { throw new BadRequest('bad_request', 'Title is required'); }
 
     if (checkExist(req.body.body)) {
       if (req.body.body.length > 5000) {
         throw new BadRequest('bad_request', 'Body is too long');
-      }
-      else newPostFields.body = req.body.body;
+      } else newPostFields.body = req.body.body;
     }
 
     const user = await getUser('email', req.body.author);
@@ -102,13 +95,13 @@ router.post('/create', jsonParser, async (req, res, next) => {
     if (req.body.attachment) newPostFields.attachment = req.body.attachment;
 
     Post.create(newPostFields, (err, post) => {
-      if (err) throw new GeneralError(`${err}`, `${err}`);
+      if (err) throw new GeneralError('server_error', `${err}`);
       else {
         user.addToSet(post._id);
         user.save().then(() => {
-          res.status(201).send({ok: 'true', post});
-        }).catch((err) => {
-          throw new GeneralError(`${err}`, `${err}`);
+          res.status(201).send({ ok: 'true', post });
+        }).catch((nextErr) => {
+          throw new GeneralError('server_error', `${nextErr}`);
         });
       }
     });
@@ -122,7 +115,8 @@ router.put('/:id/edit', jsonParser, async (req, res, next) => {
   try {
     if (!checkExist(req.params.id)) { throw new BadRequest('bad_request', 'Post is required'); }
     if (!checkExist(req.body.author)) { throw new BadRequest('bad_request', 'Author is required'); }
-    if (checkExist(req.body.title) || checkExist(req.body.body) || checkExist(req.body.attachment)) {
+    if (checkExist(req.body.title)
+      || checkExist(req.body.body) || checkExist(req.body.attachment)) {
       updatedPostFields.title = req.body.title;
       updatedPostFields.body = req.body.body;
       updatedPostFields.attachment = req.body.attachment;
@@ -136,23 +130,22 @@ router.put('/:id/edit', jsonParser, async (req, res, next) => {
         if (post.author === user.email) {
           post.set(updatedPostFields);
           post.save().then(() => {
-            res.status(200).send({ok: 'true', post});
+            res.status(200).send({ ok: 'true', post });
           }).catch((err) => {
             throw new GeneralError(`${err}`, `${err}`);
           });
         } else throw new Forbidden('forbidden', 'User is not the author of the post');
       } else throw new NotFound('not_found', 'Post not found');
     } else throw new NotFound('not_found', 'User not found');
-  }
-  catch (err) {
+  } catch (err) {
     next(err);
   }
-})
+});
 
 router.put('/:id/favorite', jsonParser, async (req, res, next) => {
   try {
-    if (!checkExist(req.params.id)) { throw new BadRequest('bad_request', 'Post is required')}
-    if (!checkExist(req.body.user)) { throw new BadRequest('bad_request', 'User is required')}
+    if (!checkExist(req.params.id)) { throw new BadRequest('bad_request', 'Post is required'); }
+    if (!checkExist(req.body.user)) { throw new BadRequest('bad_request', 'User is required'); }
 
     const post = await getPost('_id', req.params.id);
     const user = await getUser('email', req.body.user);
@@ -162,18 +155,17 @@ router.put('/:id/favorite', jsonParser, async (req, res, next) => {
         if (user.fav_posts.indexOf(post._id) === -1) {
           user.addToSet({ fav_posts: post._id });
           user.save().then(() => {
-            res.status(200).send({ok: 'true', post});
+            res.status(200).send({ ok: 'true', post });
           }).catch((err) => {
             throw new GeneralError(`${err}`, `${err}`);
           });
         } else throw new Forbidden('forbidden', 'Post is already in favorites');
       } else throw new NotFound('not_found', 'User not found');
     } else throw new NotFound('not_found', 'Post not found');
-  }
-  catch (err) {
+  } catch (err) {
     next(err);
   }
-})
+});
 
 router.put('/:id/unfavorite', jsonParser, async (req, res, next) => {
   try {
@@ -190,54 +182,52 @@ router.put('/:id/unfavorite', jsonParser, async (req, res, next) => {
         } else {
           user.pull({ fav_posts: post._id });
           user.save().then(() => {
-            res.status(200).send({ok: 'true', post});
+            res.status(200).send({ ok: 'true', post });
           }).catch((err) => {
             throw new GeneralError(`${err}`, `${err}`);
           });
         }
       } else throw new NotFound('not_found', 'Post not found');
     } else throw new NotFound('not_found', 'User not found');
-  }
-  catch (err) {
+  } catch (err) {
     next(err);
   }
-})
+});
 
 router.put('/:id/like', jsonParser, async (req, res, next) => {
   try {
-    if (!checkExist(req.params.id)) { throw new BadRequest('bad_request', 'Post is required')}
-    if (!checkExist(req.body.user)) { throw new BadRequest('bad_request', 'User is required')}
+    if (!checkExist(req.params.id)) { throw new BadRequest('bad_request', 'Post is required'); }
+    if (!checkExist(req.body.user)) { throw new BadRequest('bad_request', 'User is required'); }
 
     const post = await getPost('_id', req.params.id);
     const user = await getUser('email', req.body.user);
 
     if (checkExist(post)) {
-     if (checkExist(user)) {
-      if (user.liked.indexOf(post._id) === -1) {
-        user.addToSet({ liked: post._id });
-        user.save().then(() => {
-          post.likes++;
-          post.save().then(() => {
-            res.status(200).send({ok: 'true', post});
+      if (checkExist(user)) {
+        if (user.liked.indexOf(post._id) === -1) {
+          user.addToSet({ liked: post._id });
+          user.save().then(() => {
+            post.likes += 1;
+            post.save().then(() => {
+              res.status(200).send({ ok: 'true', post });
+            }).catch((err) => {
+              throw new GeneralError(`${err}`, `${err}`);
+            });
           }).catch((err) => {
             throw new GeneralError(`${err}`, `${err}`);
           });
-        }).catch((err) => {
-          throw new GeneralError(`${err}`, `${err}`);
-        });
-      } else throw new Forbidden('forbidden', 'Post is already liked');
-     } else throw new NotFound('not_found', 'User not found');
+        } else throw new Forbidden('forbidden', 'Post is already liked');
+      } else throw new NotFound('not_found', 'User not found');
     } else throw new NotFound('not_found', 'Post not found');
-  }
-  catch (err) {
+  } catch (err) {
     next(err);
   }
-})
+});
 
 router.put('/:id/unlike', jsonParser, async (req, res, next) => {
   try {
-    if (!checkExist(req.params.id)) { throw new BadRequest('bad_request', 'Post is required')}
-    if (!checkExist(req.body.user)) { throw new BadRequest('bad_request', 'User is required')}
+    if (!checkExist(req.params.id)) { throw new BadRequest('bad_request', 'Post is required'); }
+    if (!checkExist(req.body.user)) { throw new BadRequest('bad_request', 'User is required'); }
 
     const post = await getPost('_id', req.params.id);
     const user = await getUser('email', req.body.user);
@@ -249,9 +239,9 @@ router.put('/:id/unlike', jsonParser, async (req, res, next) => {
         } else {
           user.pull({ liked: post._id });
           user.save().then(() => {
-            post.likes--;
+            post.likes -= 1;
             post.save().then(() => {
-              res.status(200).send({ok: 'true', post});
+              res.status(200).send({ ok: 'true', post });
             }).catch((err) => {
               throw new GeneralError(`${err}`, `${err}`);
             });
@@ -261,15 +251,13 @@ router.put('/:id/unlike', jsonParser, async (req, res, next) => {
         }
       } else throw new NotFound('not_found', 'User not found');
     } else throw new NotFound('not_found', 'Post not found');
-
   } catch (err) {
     next(err);
   }
-})
+});
 
 router.delete('/:id', jsonParser, async (req, res, next) => {
   try {
-
     if (!checkExist(req.params.id)) throw new BadRequest('bad_request', 'Post is required');
     if (!checkExist(req.body.author)) throw new BadRequest('bad_request', 'Author is required');
 
@@ -292,14 +280,15 @@ router.delete('/:id', jsonParser, async (req, res, next) => {
             }).catch((err) => {
               throw new GeneralError(`${err}`, `${err}`);
             });
+          }).catch((err) => {
+            throw new GeneralError(`${err}`, `${err}`);
           });
         } else throw new Forbidden('forbidden', 'User is not the author of the post');
       } else throw new NotFound('not_found', 'User not found');
     } else throw new NotFound('not_found', 'Post not found');
-  }
-  catch (err) {
+  } catch (err) {
     next(err);
   }
-})
+});
 
 module.exports = router;

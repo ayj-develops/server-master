@@ -49,12 +49,11 @@ router.post('/:id/add', (req, res, next) => {
           body: req.body.body,
           author: req.body.body,
           parentPost: req.params.id,
-          parent: req.body.parent
-        }
+          parent: req.body.parent,
+        };
         if (post.children.indexOf(req.body.parent) === -1) {
           throw new NotFound('not_found', `Comment ${req.body.parent} not found`);
-        }
-        else {
+        } else {
           Comment.create(newCommentFields, (err, comment) => {
             if (err) {
               throw new Conflict('conflict', `Comment ${req.body.parent} already exists`);
@@ -62,16 +61,16 @@ router.post('/:id/add', (req, res, next) => {
             post.comments.push(comment);
             post.save();
             res.json({ ok: 'true', comment });
-          })
+          });
         }
       })
       .catch((err) => {
         throw new GeneralError('server_error', `Server error: ${err}`);
-      })
+      });
   } catch (err) {
     throw new GeneralError('server_error', `Server error: ${err.message}`);
   }
-})
+});
 
 // PUT /api/v0/comments/:id/update
 router.put('/:id/update', (req, res, next) => {
