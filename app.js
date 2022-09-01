@@ -33,7 +33,7 @@ admin.initializeApp({
 });
 
 // Connect to mongodb
-// connectMongo(); // comment out when testing, tests run using an in memory mongodb database
+connectMongo(); // comment out when testing, tests run using an in memory mongodb database
 
 // index
 app.get('/', (req, res) => {
