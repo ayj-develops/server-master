@@ -9,6 +9,7 @@ const {
   GeneralError, BadRequest, Conflict, NotFound,
 } = require('../middleware/error');
 const { checkExist } = require('../utils/exist');
+const Post = require('../models/post.model');
 
 // GET /api/v0/comments/
 router.get('/', (req, res, next) => {
@@ -40,29 +41,37 @@ router.get('/:id', (req, res, next) => {
   }
 });
 
-// DELETE /api/v0/comments/:id/delete
-router.delete('/:id/delete', (req, res, next) => {
+router.post('/:id/add', (req, res, next) => {
   try {
-    Comment.findById(req.params.id)
-      .then((comment) => {
-        if (!checkExist(comment)) {
-          throw new NotFound('not_found', `Comment not found: ${req.params.id}`);
+    Post.findById(req.params.id)
+      .then((post) => {
+        const newCommentFields = {
+          body: req.body.body,
+          author: req.body.body,
+          parentPost: req.params.id,
+          parent: req.body.parent
         }
-        comment.body = 'This comment has been deleted';
-        comment.deletedMessage = comment.body;
-        comment.save()
-          .then((updatedComment) => {
-            res.json({ ok: 'true', updatedComment });
-          }).catch((err) => {
-            throw new GeneralError('server_error', `Server error: ${err}`);
-          });
-      }).catch((err) => {
+        if (post.children.indexOf(req.body.parent) === -1) {
+          throw new NotFound('not_found', `Comment ${req.body.parent} not found`);
+        }
+        else {
+          Comment.create(newCommentFields, (err, comment) => {
+            if (err) {
+              throw new Conflict('conflict', `Comment ${req.body.parent} already exists`);
+            }
+            post.comments.push(comment);
+            post.save();
+            res.json({ ok: 'true', comment });
+          })
+        }
+      })
+      .catch((err) => {
         throw new GeneralError('server_error', `Server error: ${err}`);
-      });
+      })
   } catch (err) {
     throw new GeneralError('server_error', `Server error: ${err.message}`);
   }
-});
+})
 
 // PUT /api/v0/comments/:id/update
 router.put('/:id/update', (req, res, next) => {
@@ -151,6 +160,30 @@ router.put('/:id/unlike', (req, res, next) => {
     } else {
       throw new GeneralError('server_error', 'Something went wrong');
     }
+  } catch (err) {
+    throw new GeneralError('server_error', `Server error: ${err.message}`);
+  }
+});
+
+// DELETE /api/v0/comments/:id/delete
+router.delete('/:id/delete', (req, res, next) => {
+  try {
+    Comment.findById(req.params.id)
+      .then((comment) => {
+        if (!checkExist(comment)) {
+          throw new NotFound('not_found', `Comment not found: ${req.params.id}`);
+        }
+        comment.deletedMessage = comment.body;
+        comment.body = 'This comment has been deleted';
+        comment.save()
+          .then((updatedComment) => {
+            res.json({ ok: 'true', updatedComment });
+          }).catch((err) => {
+            throw new GeneralError('server_error', `Server error: ${err}`);
+          });
+      }).catch((err) => {
+        throw new GeneralError('server_error', `Server error: ${err}`);
+      });
   } catch (err) {
     throw new GeneralError('server_error', `Server error: ${err.message}`);
   }
