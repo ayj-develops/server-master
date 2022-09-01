@@ -25,13 +25,13 @@ const PostSchema = new Schema({
     maxlength: 500,
   },
   author: {
-    type: mongoose.Types.ObjectId,
+    type: String,
     unique: false,
     required: true,
     ref: 'User',
   },
   club: {
-    type: mongoose.Types.ObjectId,
+    type: String,
     unique: false,
     required: true,
     ref: 'Club',

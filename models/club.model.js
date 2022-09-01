@@ -31,7 +31,7 @@ const ClubSchema = new Schema({
   //     required: true,
   //     unique: false
   // }],
-  execs: [mongoose.Types.ObjectId],
+  execs: [String],
   // socials: {
   //     instagram: {type: String, unique: true, required: false},
   //     google_classroom_code: {type: String, unique: true, required: false},
@@ -58,14 +58,14 @@ const ClubSchema = new Schema({
   //     minlength: 1,
   //     ref: 'User'
   // }],
-  members: [mongoose.Types.ObjectId],
+  members: [String],
   // execs: [{
   //     type: mongoose.Types.ObjectId,
   //     required: false,
   //     unique: false,
   //     ref: 'User'
   // }],
-  teacher: mongoose.Types.ObjectId,
+  teacher: String,
   flairs: [String],
 });
 

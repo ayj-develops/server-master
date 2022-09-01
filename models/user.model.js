@@ -15,13 +15,13 @@ const UserSchema = new Schema({
     required: false,
   },
   clubs: [{
-    type: mongoose.Types.ObjectId,
+    type: String,
     unique: false,
     required: false,
     ref: 'Club',
   }],
   favorite_clubs: [{
-    type: mongoose.Types.ObjectId,
+    type: String,
     unique: false,
     required: false,
     ref: 'Club',
