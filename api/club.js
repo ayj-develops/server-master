@@ -6,7 +6,6 @@ const { BadRequest, NotFound, GeneralError } = require('../middleware/error');
 const { checkExist } = require('../utils/exist');
 const { slugit } = require('../utils/stringUtils');
 const User = require('../models/user.model');
-const mongoose = require('mongoose');
 
 // GET /api/v0/clubs/
 router.get('/', (req, res, next) => {

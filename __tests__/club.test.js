@@ -16,7 +16,6 @@ describe('Club Endpoint Tests', () => {
     const tempMongoDB = await MongoMemoryServer.create();
     await mongoose.connect(`${tempMongoDB.getUri()}`, { useNewUrlParser: true, useUnifiedTopology: true });
     await setUpUsers();
-    console.log('setUpUsers() completed');
   });
 
   it('POST /clubs/create should create a new club WITHOUT: execs, flairs, posts, members', async () => {
