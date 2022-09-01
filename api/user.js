@@ -159,7 +159,7 @@ router.get('/posts', async (req, res, next) => {
 });
 
 // GET /api/v0/users/liked
-router.get('/:id/liked', async (req, res, next) => {
+router.get('/liked', async (req, res, next) => {
   try {
     const { email } = req.params;
     let commentsResponse = [];
