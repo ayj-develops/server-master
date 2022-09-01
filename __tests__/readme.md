@@ -4,6 +4,8 @@
 > - Do not use `if` statements for tests, instead if the need arises, split the test into two different tests
 > - Write the test in 'arrange', 'act', and 'assert'
 
+**NOTE:** Before all tests, comment out `connectMongo()` in app.js
+
 ## Write a test suite first:
 
 ```js
