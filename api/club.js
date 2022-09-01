@@ -18,6 +18,28 @@ router.get('/', (req, res, next) => {
     });
 });
 
+// GET /api/v0/clubs/:id/members
+router.get('/:id/members', (req, res, next) => {
+  Club.find()
+    .then((clubs) => {
+      res.status(200).json({ ok: 'true', members: [clubs.members] });
+    })
+    .catch((err) => {
+      next(err);
+    })
+})
+
+// GET /api/v0/clubs/:id/executives
+router.get('/:id/executives', (req, res, next) => {
+  Club.find()
+    .then((clubs) => {
+      res.status(200).json({ ok: 'true', executives: [clubs.execs] });
+    })
+    .catch((err) => {
+      next(err);
+    })
+})
+
 // POST /api/v0/clubs/create
 router.post('/create', (req, res, next) => {
   const {
