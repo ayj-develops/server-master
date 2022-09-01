@@ -2,10 +2,11 @@ const express = require('express');
 
 const router = express.Router();
 const Club = require('../models/club.model');
-const { BadRequest, NotFound, GeneralError } = require('../middleware/error');
+const { BadRequest, NotFound, GeneralError, Forbidden } = require('../middleware/error');
 const { checkExist } = require('../utils/exist');
 const { slugit } = require('../utils/stringUtils');
 const User = require('../models/user.model');
+const Post = require('../models/post.model');
 
 // GET /api/v0/clubs/
 router.get('/', (req, res, next) => {
@@ -161,9 +162,34 @@ router.put('/:id/update', (req, res, next) => {
 // DELETE /api/v0/clubs/:id/delete
 router.delete('/:id/delete', (req, res, next) => {
   try {
-    Club.findByIdAndRemove(req.params.id)
+    if (!checkExist(req.body.user)) throw new BadRequest('bad_parameter', 'Missing required fields');
+    Club.findById(req.params.id)
       .then((club) => {
-        res.status(200).json({ ok: 'true', club });
+        if (club.teacher === req.body.user) {
+          throw new Forbidden('forbidden', 'You are not allowed to delete this club');
+        } else {
+          for (let i = 0; i < club.posts.length; i++) {
+            Post.findByIdAndRemove(club.posts[i], (err, post) => {
+              if (err) throw new GeneralError('server_error', `Server error: ${err}`);
+              for (let x = 0; x < post.comments.length; x++) {
+                Comment.findByIdAndRemove(post.comments[x], (err, comment) => {
+                  if (err) {
+                    throw new GeneralError('server_error', `Server error: ${err}`);
+                  }
+                }).catch((err) => {
+                  next(err);
+                });
+              }
+            });
+          }
+          club.remove()
+            .then((club) => {
+            res.status(200).json({ ok: 'true', club });
+          })
+          .catch((err) => {
+            throw new GeneralError('server_error', `Server error: ${err}`);
+          })
+        }
       }).catch((err) => {
         throw new NotFound('not_found', `Club ${req.params.id} not found: ${err}`);
       });

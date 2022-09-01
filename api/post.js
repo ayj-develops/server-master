@@ -279,10 +279,19 @@ router.delete('/:id', jsonParser, async (req, res, next) => {
     if (checkExist(post)) {
       if (checkExist(user)) {
         if (post.author === user.email) {
-          post.remove().then(() => {
-            res.status(200).send({ok: 'true'});
-          }).catch((err) => {
-            throw new GeneralError(`${err}`, `${err}`);
+          const club = await getClub('name', post.club);
+          club.pull({ posts: post._id });
+          club.save().then(() => {
+            for (let i = 0; i < post.comments.length; i++) {
+              Comment.findByIdAndRemove(post.comments[i], (err) => {
+                if (err) throw new GeneralError(`${err}`, `${err}`);
+              })
+            }
+            post.remove().then(() => {
+              res.status(200).send({ok: 'true'});
+            }).catch((err) => {
+              throw new GeneralError(`${err}`, `${err}`);
+            });
           });
         } else throw new Forbidden('forbidden', 'User is not the author of the post');
       } else throw new NotFound('not_found', 'User not found');
