@@ -53,16 +53,16 @@ router.post('/create', async (req, res, next) => {
   }
 });
 
-// GET /api/v0/users/:id/
-router.get('/:id', async (req, res, next) => {
+// GET /api/v0/users/user
+router.get('/user', async (req, res, next) => {
   try {
-    const { id } = req.params;
-    if (!checkExist(id)) {
-      throw new BadRequest('bad_parameter', 'Missing parameter: id');
+    const { email } = req.params;
+    if (!checkExist(email)) {
+      throw new BadRequest('bad_parameter', 'Missing parameter: email');
     }
-    const user = await User.findById(id);
+    const user = await User.findBy({ email });
     if (!checkExist(user)) {
-      throw new NotFound('user_not_found', `User not found with id: ${id}`);
+      throw new NotFound('user_not_found', `User not found with email: ${email}`);
     } else {
       res.json({ ok: 'true', user });
     }
@@ -71,37 +71,37 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-// DELETE /api/v0/users/:id/delete
-router.delete('/:id/delete', async (req, res, next) => {
+// DELETE /api/v0/users/delete
+router.delete('/delete', async (req, res, next) => {
   try {
-    const { id } = req.params;
-    if (!checkExist(id)) {
-      throw new BadRequest('bad_parameter', 'Missing parameter: id');
+    const { email } = req.params;
+    if (!checkExist(email)) {
+      throw new BadRequest('bad_parameter', 'Missing parameter: email');
     }
-    const user = await User.findById(id);
+    const user = await User.find({ email });
     if (!checkExist(user)) {
-      throw new NotFound('user_not_found', `User not found with id: ${id}`);
+      throw new NotFound('user_not_found', `User not found with email: ${email}`);
     } else {
-      await User.findByIdAndDelete(id);
-      res.json({ ok: 'true', message: `User with id: ${id} deleted` });
+      await User.findOneAndDelete({ email });
+      res.json({ ok: 'true', message: `User with id: ${email} deleted` });
     }
   } catch (err) {
     next(err);
   }
 });
 
-// GET /api/v0/users/:id/comments
-router.get('/:id/comments', async (req, res, next) => {
+// GET /api/v0/users/comments
+router.get('/comments', async (req, res, next) => {
   try {
-    const { id } = req.params;
-    if (!checkExist(id)) {
-      throw new BadRequest('bad_parameter', 'Missing parameter: id');
+    const { email } = req.params;
+    if (!checkExist(email)) {
+      throw new BadRequest('bad_parameter', 'Missing parameter: email');
     }
-    const user = await User.findById(id);
+    const user = await User.find({ email });
     if (!checkExist(user)) {
-      throw new NotFound('user_not_found', `User not found with id: ${id}`);
+      throw new NotFound('user_not_found', `User not found with email: ${email}`);
     } else {
-      const comments = await Comment.find({ author: id });
+      const comments = await Comment.find({ author: user._id });
       res.json({ ok: 'true', comments });
     }
   } catch (err) {
@@ -109,16 +109,16 @@ router.get('/:id/comments', async (req, res, next) => {
   }
 });
 
-// GET /api/v0/users/:id/favourites
-router.get('/:id/favourites', async (req, res, next) => {
+// GET /api/v0/users/favourites
+router.get('/favourites', async (req, res, next) => {
   try {
-    const { id } = req.params;
-    if (!checkExist(id)) {
-      throw new BadRequest('bad_parameter', 'Missing parameter: id');
+    const { email } = req.params;
+    if (!checkExist(email)) {
+      throw new BadRequest('bad_parameter', 'Missing parameter: email');
     }
-    const user = await User.findById(id);
+    const user = await User.find({ email });
     if (!checkExist(user)) {
-      throw new NotFound('user_not_found', `User not found with id: ${id}`);
+      throw new NotFound('user_not_found', `User not found with email: ${email}`);
     } else {
       const { type } = req.query;
       if (!checkExist(type)) {
@@ -140,17 +140,17 @@ router.get('/:id/favourites', async (req, res, next) => {
 });
 
 // GET /api/v0/users/:id/posts
-router.get('/:id/posts', async (req, res, next) => {
+router.get('/posts', async (req, res, next) => {
   try {
-    const { id } = req.params;
-    if (!checkExist(id)) {
-      throw new BadRequest('bad_parameter', 'Missing parameter: id');
+    const { email } = req.params;
+    if (!checkExist(email)) {
+      throw new BadRequest('bad_parameter', 'Missing parameter: email');
     }
-    const user = await User.findById(id);
+    const user = await User.find({ email });
     if (!checkExist(user)) {
-      throw new NotFound('user_not_found', `User not found with id: ${id}`);
+      throw new NotFound('user_not_found', `User not found with email: ${email}`);
     } else {
-      const posts = await Post.find({ author: id });
+      const posts = await Post.find({ author: user._id });
       res.json({ ok: 'true', posts });
     }
   } catch (err) {
@@ -158,20 +158,20 @@ router.get('/:id/posts', async (req, res, next) => {
   }
 });
 
-// GET /api/v0/users/:id/liked
+// GET /api/v0/users/liked
 router.get('/:id/liked', async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { email } = req.params;
     let commentsResponse = [];
     let postsResponse = [];
     let commentsWorked = false;
     let postsWorked = false;
-    if (!checkExist(id)) {
-      throw new BadRequest('bad_parameter', 'Missing parameter: id');
+    if (!checkExist(email)) {
+      throw new BadRequest('bad_parameter', 'Missing parameter: email');
     }
-    const user = await User.findById(id);
+    const user = await User.find({ email });
     if (!checkExist(user)) {
-      throw new NotFound('user_not_found', `User not found with id: ${id}`);
+      throw new NotFound('user_not_found', `User not found with id: ${email}`);
     } else {
       const { type } = req.query;
       if (!checkExist(type)) {
