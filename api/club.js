@@ -156,7 +156,6 @@ router.put('/:id/executives/new', (req, res, next) => {
     const {
       id: executiveId,
     } = req.body;
-    console.log(executiveId);
     if (!checkExist(executiveId)) {
       throw new BadRequest('bad_parameter', 'Missing required fields: id');
     }
