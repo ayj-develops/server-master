@@ -2,9 +2,11 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const hash = require('object-hash');
 const mongoose = require('mongoose');
-const { checkExist } = require('../utils/exist');
+const { checkExist } = require('./exist');
 const Post = require('../models/post.model');
 const User = require('../models/user.model');
+const Club = require('../models/club.model');
+const Comment = require('../models/comment.model');
 const { getUser, getPost, getClub } = require('../utils/queries');
 const {
   BadRequest, NotFound, Forbidden, GeneralError, Conflict,
@@ -13,49 +15,101 @@ const {
 const router = express.Router();
 const jsonParser = bodyParser.json();
 
+// GET /api/v0/post/club/:id
+router.get('/club/:id', (req, res, next) => {
+  try {
+    Post.find({ club: req.params.id })
+      .then((posts) => {
+        res.status(200).json(posts);
+      })
+      .catch((err) => {
+        throw new NotFound('not_found', `Club ${req.params.id} not found: ${err}`);
+      });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/post/:id
+router.get('/:id', (req, res, next) => {
+  try {
+    Post.findById(req.params.id)
+      .then((post) => {
+        if (post) {
+          res.status(200).json(post);
+        } else {
+          throw new NotFound('not_found', `Post ${req.params.id} not found`);
+        }
+      })
+      .catch((err) => {
+        throw new NotFound('not_found', `Post ${req.params.id} not found: ${err}`);
+      });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/v0/post/:id/comments
+router.get('/:id/comments', (req, res, next) => {
+  try {
+    Post.findById(req.params.id)
+      .then((post) => {
+        if (post) {
+          res.status(200).json(post.comments);
+        } else {
+          throw new NotFound('not_found', `Post ${req.params.id} not found`);
+        }
+      })
+      .catch((err) => {
+        throw new NotFound('not_found', `Post ${req.params.id} not found: ${err}`);
+      });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v0/post/create
 router.post('/create', jsonParser, async (req, res, next) => {
   const newPostFields = {};
 
   try {
-    if (checkExist(req.body.title)) newPostFields.title = req.body.title;
-    else throw new BadRequest('Missing required field: title');
+    if (checkExist(req.body.title)) { newPostFields.title = req.body.title; } 
+    else { throw new BadRequest('bad_request', 'Title is required'); }
 
     if (checkExist(req.body.body)) {
-      if (req.body.body.length > 500) {
-        throw new BadRequest('Post body exceeded character limit');
-      } else {
-        newPostFields.body = req.body.body;
+      if (req.body.body.length > 5000) {
+        throw new BadRequest('bad_request', 'Body is too long');
       }
-    }
-    const user = await getUser('_id', req.body.author);
-    if (checkExist(req.body.author)) {
-      if (checkExist(user)) newPostFields.author = user._id;
-      else throw new NotFound('User not found');
-    } else throw new BadRequest('Missing required field: author');
-
-    const club = await getClub('_id', req.body.club);
-    if (checkExist(req.body.club)) {
-      if (checkExist(club)) {
-        if (club.members.filter((members) => members === req.body.author) === undefined) throw new Forbidden('This user is not authorized to post within this club');
-        else newPostFields.club = club._id;
-      } else throw new NotFound('Club not found');
+      else newPostFields.body = req.body.body;
     }
 
-    if (checkExist(req.body.flair)) {
-      if (!club.flairs.find(req.body.flair) === undefined) newPostFields.flair = req.body.flair;
-    }
+    const user = await getUser('email', req.body.author);
+    if (checkExist(user)) {
+      if (checkExist(user)) newPostFields.author = user.email;
+      else throw new NotFound('not_found', 'User not found');
+    } else throw new BadRequest('bad_request', 'Author is required');
+
+    const club = await getClub('name', req.body.club);
+    if (checkExist(club)) {
+      if (club.members.filter((members) => members === req.body.author) === undefined) throw new Forbidden('forbidden', 'User is not a member of the club');
+      else newPostFields.club = club.name;
+    } else throw new NotFound('not_found', 'Club not found');
+
+    if (req.body.flairs) newPostFields.flairs = req.body.flairs;
 
     newPostFields.likes = 0;
 
-    if (checkExist(req.body.flairs)) newPostFields.flairs = req.body.flairs;
-    if (checkExist(req.body.attachment)) newPostFields.attachment = req.body.attachment;
+    if (req.body.attachment) newPostFields.attachment = req.body.attachment;
 
     Post.create(newPostFields, (err, post) => {
       if (err) throw new GeneralError(`${err}`, `${err}`);
       else {
-        user.posts.addToSet(post._id);
-        user.save().then(() => { res.status(201).send({ Message: 'Success' }); })
-          .catch((err) => { throw new GeneralError(`${err}`, `${err}`); });
+        user.addToSet(post._id);
+        user.save().then(() => {
+          res.status(201).send({ok: 'true', post});
+        }).catch((err) => {
+          throw new GeneralError(`${err}`, `${err}`);
+        });
       }
     });
   } catch (err) {
@@ -63,187 +117,180 @@ router.post('/create', jsonParser, async (req, res, next) => {
   }
 });
 
-router.get('/', jsonParser, async (req, res) => {
-  if (!checkExist(req.query._id)) res.status(200).send(await Post.find());
-  else {
-    const { _id } = req.body;
-    Post.findById({ _id }, (err, post) => {
-      console.log(post);
-      if (err) res.status(500).send({ Message: 'Error' });
-      else if (post === null) res.status(400).send({ Message: 'Post not found' });
-      else {
-        res.status(200).send(post);
-      }
-    });
+router.put('/:id/edit', jsonParser, async (req, res, next) => {
+  const updatedPostFields = {};
+  try {
+    if (!checkExist(req.params.id)) { throw new BadRequest('bad_request', 'Post is required'); }
+    if (!checkExist(req.body.author)) { throw new BadRequest('bad_request', 'Author is required'); }
+    if (checkExist(req.body.title) || checkExist(req.body.body) || checkExist(req.body.attachment)) {
+      updatedPostFields.title = req.body.title;
+      updatedPostFields.body = req.body.body;
+      updatedPostFields.attachment = req.body.attachment;
+    } else throw new BadRequest('bad_request', 'Title, body or attachment is required');
+
+    const user = await getUser('email', req.body.author);
+    const post = await getPost('_id', req.params.id);
+
+    if (checkExist(user)) {
+      if (checkExist(post)) {
+        if (post.author === user.email) {
+          post.set(updatedPostFields);
+          post.save().then(() => {
+            res.status(200).send({ok: 'true', post});
+          }).catch((err) => {
+            throw new GeneralError(`${err}`, `${err}`);
+          });
+        } else throw new Forbidden('forbidden', 'User is not the author of the post');
+      } else throw new NotFound('not_found', 'Post not found');
+    } else throw new NotFound('not_found', 'User not found');
   }
-});
-
-router.delete('/delete', jsonParser, async (req, res) => {
-  const { _id } = req.body;
-  if (!checkExist(_id)) {
-    res.status(400).send({ Message: 'ID params are missing' });
-  } else if (!checkExist(req.body.author)) {
-    res.status(400).send({ Message: 'Author params are missing' });
-  } else {
-    const author = hash(req.body.author, { algorithm: 'sha1' });
-    Post.findById({ _id }, (err, post) => {
-      if (err) {
-        res.status(500).send({ Message: 'Error' });
-      } else if (post === null) {
-        res.status(400).send({ Message: 'Post not found' });
-      } else if (post.author !== author) {
-        res.status(400).send({ Message: 'You are not OP' });
-      } else {
-        throw new BadRequest('Bad Request', `${err}`);
-      }
-    });
+  catch (err) {
+    next(err);
   }
-});
+})
 
-router.delete('/delete', jsonParser, async (req, res) => {
-  const { _id } = req.body;
-  if (_id === null) {
-    res.status(400).send({ Message: 'ID params are missing' });
-  } else if (req.body.author === null) {
-    res.status(400).send({ Message: 'Author params are missing' });
-  } else {
-    const author = hash(req.body.author, { algorithm: 'sha1' });
-    Post.findById({ _id }, (err, post) => {
-      if (err) {
-        res.status(500).send({ Message: 'Error' });
-      } else if (post === null) {
-        res.status(400).send({ Message: 'Post not found' });
-      } else if (post.author !== author) {
-        res.status(400).send({ Message: 'You are not OP' });
-      } else {
-        throw new BadRequest('Bad Request', `${err}`);
-      }
-    });
-  }
-});
-
-/**
- * Delete club through :slug
- */
-router.delete('/slug/:slug/delete', jsonParser, async (req, res, next) => {
-  const filterSlug = req.params.slug;
+router.put('/:id/favorite', jsonParser, async (req, res, next) => {
   try {
-    Post.findOneAndDelete({ slug: filterSlug }, (err, post) => {
-      if (err) {
-        throw new BadRequest('Bad Request', `${err}`);
-      } else if (!checkExist(post)) throw new NotFound(`Not found: ${filterSlug}`);
-      else res.status(200).send(post);
-    });
-  } catch (err) { next(err); }
-});
+    if (!checkExist(req.params.id)) { throw new BadRequest('bad_request', 'Post is required')}
+    if (!checkExist(req.body.user)) { throw new BadRequest('bad_request', 'User is required')}
 
-/**
- * update post by fetching through id
- */
-router.put('/id/:id/update', jsonParser, async (req, res, next) => {
-  const filterId = req.params.id;
-  const updateFields = {};
+    const post = await getPost('_id', req.params.id);
+    const user = await getUser('email', req.body.user);
 
-  try {
-    if (req.body.title) {
-      updateFields.title = req.body.title;
-      const slug = slugify(req.body.title, { lower: true });
-      updateFields.slug = slug;
-    }
-    if (req.body.body) updateFields.body = req.body.body;
-    if (req.body.author) updateFields.author = req.body.author;
-    if (req.body.image) updateFields.image = req.body.image;
-    if (req.body.club) updateFields.club = req.body.club;
-
-    Post.findOneAndUpdate(
-      { _id: mongoose.mongo.ObjectId(filterId) },
-      updateFields,
-      { new: true },
-      (err, club) => {
-        if (err) throw new GeneralError(`${err}`, `${err}`);
-        else if (checkExist(club)) throw new NotFound(`Not found: ${filterId}`);
-        else {
-          res.status(200).send(club);
-        }
-      },
-    );
-  } catch (err) { next(err); }
-});
-
-/**
- * update post by fetching through slug
- */
-router.put('/slug/:slug/update', jsonParser, async (req, res, next) => {
-  const filterSlug = req.params.id;
-  const updateFields = {};
-
-  try {
-    if (req.body.title) {
-      updateFields.title = req.body.title;
-      const slug = slugify(req.body.title, { lower: true });
-      updateFields.slug = slug;
-    }
-    if (req.body.body) updateFields.body = req.body.body;
-    if (req.body.author) updateFields.author = req.body.author;
-    if (req.body.image) updateFields.image = req.body.image;
-    if (req.body.club) updateFields.club = req.body.club;
-
-    Post.findOneAndUpdate(
-      { slug: filterSlug },
-      updateFields,
-      { new: true },
-      (err, club) => {
-        if (err) throw new GeneralError(`${err}`, `${err}`);
-        else if (checkExist(club)) throw new NotFound(`Not found: ${filterSlug}`);
-        else {
-          res.status(200).send(club);
-        }
-      },
-    );
-  } catch (err) { next(err); }
-});
-
-router.put('/favorite', jsonParser, async (req, res, next) => {
-  try {
-    const { userID, postID } = req.body;
-
-    if (!checkExist(userID)) throw new BadRequest('Missing required field: userID');
-    else if (!checkExist(postID)) throw new BadRequest('Missing required field: clubID');
-
-    else {
-      const user = await getUser('_id', userID);
+    if (checkExist(post)) {
       if (checkExist(user)) {
-        const post = await getPost('_id', postID);
-        if (checkExist(post)) {
-          user.fav_posts.addToSet(postID);
+        if (user.fav_posts.indexOf(post._id) === -1) {
+          user.addToSet({ fav_posts: post._id });
           user.save().then(() => {
-            res.status(200).json({ Message: 'Success' });
-          })
-            .catch((err) => { throw new GeneralError(`${err} , ${err}`); });
-        } else throw new NotFound('Post not found');
-      } else throw new NotFound('User not found');
-    }
-  } catch (err) { next(err); }
-});
+            res.status(200).send({ok: 'true', post});
+          }).catch((err) => {
+            throw new GeneralError(`${err}`, `${err}`);
+          });
+        } else throw new Forbidden('forbidden', 'Post is already in favorites');
+      } else throw new NotFound('not_found', 'User not found');
+    } else throw new NotFound('not_found', 'Post not found');
+  }
+  catch (err) {
+    next(err);
+  }
+})
 
-router.put('/unfavorite', jsonParser, async (req, res, next) => {
+router.put('/:id/unfavorite', jsonParser, async (req, res, next) => {
   try {
-    const { userID, postID } = req.body;
+    if (!checkExist(req.body.user)) throw new BadRequest('bad_request', 'User is required');
+    if (!checkExist(req.params.id)) throw new BadRequest('bad_request', 'Post is required');
 
-    if (!checkExist(userID)) throw new BadRequest('Missing required field: userID');
-    else if (!checkExist(postID)) throw new BadRequest('Missing required field: postID');
-    else {
-      const user = await getUser('_id', userID);
+    const user = await getUser('email', req.body.user);
+    const post = await getPost('_id', req.params.id);
+
+    if (checkExist(user)) {
+      if (checkExist(post)) {
+        if (user.fav_posts.indexOf(post._id) === -1) {
+          throw new Forbidden('forbidden', 'Post is not in favorites');
+        } else {
+          user.pull({ fav_posts: post._id });
+          user.save().then(() => {
+            res.status(200).send({ok: 'true', post});
+          }).catch((err) => {
+            throw new GeneralError(`${err}`, `${err}`);
+          });
+        }
+      } else throw new NotFound('not_found', 'Post not found');
+    } else throw new NotFound('not_found', 'User not found');
+  }
+  catch (err) {
+    next(err);
+  }
+})
+
+router.put('/:id/like', jsonParser, async (req, res, next) => {
+  try {
+    if (!checkExist(req.params.id)) { throw new BadRequest('bad_request', 'Post is required')}
+    if (!checkExist(req.body.user)) { throw new BadRequest('bad_request', 'User is required')}
+
+    const post = await getPost('_id', req.params.id);
+    const user = await getUser('email', req.body.user);
+
+    if (checkExist(post)) {
+     if (checkExist(user)) {
+      if (user.liked.indexOf(post._id) === -1) {
+        user.addToSet({ liked: post._id });
+        user.save().then(() => {
+          post.likes++;
+          post.save().then(() => {
+            res.status(200).send({ok: 'true', post});
+          }).catch((err) => {
+            throw new GeneralError(`${err}`, `${err}`);
+          });
+        }).catch((err) => {
+          throw new GeneralError(`${err}`, `${err}`);
+        });
+      } else throw new Forbidden('forbidden', 'Post is already liked');
+     } else throw new NotFound('not_found', 'User not found');
+    } else throw new NotFound('not_found', 'Post not found');
+  }
+  catch (err) {
+    next(err);
+  }
+})
+
+router.put('/:id/unlike', jsonParser, async (req, res, next) => {
+  try {
+    if (!checkExist(req.params.id)) { throw new BadRequest('bad_request', 'Post is required')}
+    if (!checkExist(req.body.user)) { throw new BadRequest('bad_request', 'User is required')}
+
+    const post = await getPost('_id', req.params.id);
+    const user = await getUser('email', req.body.user);
+
+    if (checkExist(post)) {
       if (checkExist(user)) {
-        const post = await getPost('_id', postID);
-        if (checkExist(post)) {
-          user.fav_posts.pull(postID);
-          user.save().then(() => { res.status(200).json({ Message: 'Success' }); })
-            .catch((err) => { throw new GeneralError(`${err}, ${err}`); });
-        } else throw new NotFound('Post not found');
-      } else throw new NotFound('User not found');
-    }
-  } catch (err) { next(err); }
-});
+        if (user.liked.indexOf(post._id) === -1) {
+          throw new Forbidden('forbidden', 'Post is not liked');
+        } else {
+          user.pull({ liked: post._id });
+          user.save().then(() => {
+            post.likes--;
+            post.save().then(() => {
+              res.status(200).send({ok: 'true', post});
+            }).catch((err) => {
+              throw new GeneralError(`${err}`, `${err}`);
+            });
+          }).catch((err) => {
+            throw new GeneralError(`${err}`, `${err}`);
+          });
+        }
+      } else throw new NotFound('not_found', 'User not found');
+    } else throw new NotFound('not_found', 'Post not found');
+
+  } catch (err) {
+    next(err);
+  }
+})
+
+router.delete('/:id', jsonParser, async (req, res, next) => {
+  try {
+
+    if (!checkExist(req.params.id)) throw new BadRequest('bad_request', 'Post is required');
+    if (!checkExist(req.body.author)) throw new BadRequest('bad_request', 'Author is required');
+
+    const post = await getPost('_id', req.params.id);
+    const user = await getUser('email', req.body.author);
+
+    if (checkExist(post)) {
+      if (checkExist(user)) {
+        if (post.author === user.email) {
+          post.remove().then(() => {
+            res.status(200).send({ok: 'true'});
+          }).catch((err) => {
+            throw new GeneralError(`${err}`, `${err}`);
+          });
+        } else throw new Forbidden('forbidden', 'User is not the author of the post');
+      } else throw new NotFound('not_found', 'User not found');
+    } else throw new NotFound('not_found', 'Post not found');
+  }
+  catch (err) {
+    next(err);
+  }
+})
 
 module.exports = router;
