@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const Post = require('../models/post.model');
+const Comment = require('../models/comment.model');
 const { checkExist } = require('../utils/exist');
 const { getUser, getPost, getClub } = require('../utils/queries');
 const {
@@ -270,13 +271,14 @@ router.delete('/:id', jsonParser, async (req, res, next) => {
           const club = await getClub('name', post.club);
           club.pull({ posts: post._id });
           club.save().then(() => {
+            // eslint-disable-next-line no-plusplus
             for (let i = 0; i < post.comments.length; i++) {
               Comment.findByIdAndRemove(post.comments[i], (err) => {
                 if (err) throw new GeneralError(`${err}`, `${err}`);
-              })
+              });
             }
             post.remove().then(() => {
-              res.status(200).send({ok: 'true'});
+              res.status(200).send({ ok: 'true' });
             }).catch((err) => {
               throw new GeneralError(`${err}`, `${err}`);
             });

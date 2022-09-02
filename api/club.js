@@ -2,7 +2,10 @@ const express = require('express');
 
 const router = express.Router();
 const Club = require('../models/club.model');
-const { BadRequest, NotFound, GeneralError, Forbidden } = require('../middleware/error');
+const Comment = require('../models/comment.model');
+const {
+  BadRequest, NotFound, GeneralError, Forbidden,
+} = require('../middleware/error');
 const { checkExist } = require('../utils/exist');
 const { slugit } = require('../utils/stringUtils');
 const User = require('../models/user.model');
@@ -27,8 +30,8 @@ router.get('/:id/members', (req, res, next) => {
     })
     .catch((err) => {
       next(err);
-    })
-})
+    });
+});
 
 // GET /api/v0/clubs/:id/executives
 router.get('/:id/executives', (req, res, next) => {
@@ -38,8 +41,8 @@ router.get('/:id/executives', (req, res, next) => {
     })
     .catch((err) => {
       next(err);
-    })
-})
+    });
+});
 
 // POST /api/v0/clubs/create
 router.post('/create', (req, res, next) => {
@@ -183,12 +186,12 @@ router.delete('/:id/delete', (req, res, next) => {
             });
           }
           club.remove()
-            .then((club) => {
-            res.status(200).json({ ok: 'true', club });
-          })
-          .catch((err) => {
-            throw new GeneralError('server_error', `Server error: ${err}`);
-          })
+            .then((responseClub) => {
+              res.status(200).json({ ok: 'true', responseClub });
+            })
+            .catch((err) => {
+              throw new GeneralError('server_error', `Server error: ${err}`);
+            });
         }
       }).catch((err) => {
         throw new NotFound('not_found', `Club ${req.params.id} not found: ${err}`);
