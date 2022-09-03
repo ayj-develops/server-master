@@ -6,7 +6,7 @@ const Comment = require('../models/comment.model');
 const Post = require('../models/post.model');
 const { checkExist } = require('../utils/exist');
 
-const { NotFound, BadRequest, Conflict } = require('../middleware/error');
+const { NotFound, BadRequest } = require('../middleware/error');
 
 // GET /api/v0/users/
 router.get('/', async (req, res, next) => {
@@ -24,48 +24,38 @@ router.post('/create', async (req, res, next) => {
     const {
       email: userEmail,
       account_type: userAccountType,
-      clubs: userClubs,
+      profile_pic: userProfilePic,
     } = req.body;
     let newUserAccountType = userAccountType || 'student';
-    if (!checkExist(userEmail) || !checkExist(userClubs)) {
-      throw new BadRequest('bad_parameter', 'Missing parameters: email, clubs');
+    if (!checkExist(userEmail)) {
+      throw new BadRequest('bad_parameter', 'Missing parameters: email');
     }
     if (userEmail.endsWith('@student.tdsb.on.ca')) {
       newUserAccountType = 'student';
     } else if (userEmail.endsWith('@tdsb.on.ca')) {
       newUserAccountType = 'teacher';
     } else {
-      throw new BadRequest('Invalid email');
+      throw new BadRequest('bad_parameter', 'Invalid email');
     }
-    const user = await User.findOne({ email: userEmail });
-    if (user) {
-      next(new Conflict('parameter_taken', `User already exists with email: ${userEmail}`));
-    } else {
-      const newUser = await User.create({
-        email: userEmail,
-        account_type: newUserAccountType,
-        clubs: userClubs,
-      });
-      res.json({ ok: 'true', newUser });
-    }
+    const newUser = await User.findOneAndUpdate({}, {
+      email: userEmail,
+      account_type: newUserAccountType,
+      profile_pic: userProfilePic,
+    }, { upsert: true, new: true });
+    res.json({ ok: 'true', newUser });
   } catch (err) {
     next(err);
   }
 });
 
 // GET /api/v0/users/user
-router.get('/user', async (req, res, next) => {
+router.get('/:id', async (req, res, next) => {
   try {
-    const { email } = req.params;
-    if (!checkExist(email)) {
-      throw new BadRequest('bad_parameter', 'Missing parameter: email');
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      throw new NotFound('user_not_found', 'User not found');
     }
-    const user = await User.findBy({ email });
-    if (!checkExist(user)) {
-      throw new NotFound('user_not_found', `User not found with email: ${email}`);
-    } else {
-      res.json({ ok: 'true', user });
-    }
+    res.json({ ok: 'true', user });
   } catch (err) {
     next(err);
   }

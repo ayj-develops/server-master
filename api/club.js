@@ -102,7 +102,7 @@ router.get('/:id', (req, res, next) => {
   try {
     Club.findById(req.params.id)
       .then((club) => {
-        res.status(200).json(club);
+        res.status(200).json({ ok: 'true', club });
       })
       .catch((err) => {
         throw new NotFound('not_found', `Club ${req.params.id} not found: ${err}`);

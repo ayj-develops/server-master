@@ -61,7 +61,7 @@ const ClubSchema = new Schema({
   //     minlength: 1,
   //     ref: 'User'
   // }],
-  members: [String],
+  members: [mongoose.Types.ObjectId],
   // execs: [{
   //     type: mongoose.Types.ObjectId,
   //     required: false,

@@ -53,7 +53,7 @@ app.use(handleErrors);
 /* define api routes */
 const userRouter = require('./api/user');
 
-app.use(`${API_ROUTE}/user`, userRouter);
+app.use(`${API_ROUTE}/users`, userRouter);
 
 const commentRouter = require('./api/comment');
 

@@ -9,6 +9,9 @@ const UserSchema = new Schema({
     trim: true,
     unique: true,
   },
+  profile_pic: {
+    type: String,
+  },
   clubs: [{
     type: String,
     unique: false,
